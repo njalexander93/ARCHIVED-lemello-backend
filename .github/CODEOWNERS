@@ -1,0 +1,4 @@
+# CODEOWNERS file for lemello-app/backend
+# All files in this repository require review from the repository owner
+
+* @njalexander93

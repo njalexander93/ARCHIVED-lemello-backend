@@ -1,13 +1,29 @@
-# ChefAI Backend
+<h1><img src=".github/assets/lemello-horizontal-yellow.svg" alt="Lemello" height="28px" vertical-align="middle"> Backend</h1>
 
-The **ChefAI Backend** is the core service layer for ChefAI. It is responsible for:
 
-- Orchestrating AI-assisted recipe creation sessions
+The core service layer for Lemello — an AI-powered cooking platform that transforms nervous recipe-followers into confident recipe-creators.
+
+---
+
+## Overview
+
+The backend is responsible for:
+
+- Orchestrating AI-assisted recipe creation sessions (the "Sous-Chef" experience)
 - Managing persistence of recipes, drafts, and forks
-- Providing a secure API for the frontend
+- Providing a secure API for the webapp
 - Integrating with OpenAI models via an internal LLM gateway
 
-The backend is built with **FastAPI** and follows modern Python, security, and DevSecOps best practices.
+Built with **FastAPI** following modern Python, security, and DevSecOps best practices.
+
+---
+
+## Related Repositories
+
+| Repository | Description |
+|------------|-------------|
+| [lemello-app/webapp](https://github.com/lemello-app/webapp) | Next.js Progressive Web App |
+| [lemello-app/infra](https://github.com/lemello-app/infra) | Terraform, Docker, and deployment configs |
 
 ---
 
@@ -35,7 +51,7 @@ The backend is built with **FastAPI** and follows modern Python, security, and D
 
 ## Deployment Target
 
-ChefAI Backend is deployed on **DigitalOcean App Platform** using containerized deployments.
+Lemello Backend is deployed on **DigitalOcean App Platform** using containerized deployments.
 
 ### Infrastructure Overview
 
@@ -56,13 +72,11 @@ The backend follows an immutable deployment strategy:
 
 ## Installing Python 3.14
 
-ChefAI Backend is standardized on **Python 3.14**. All contributors and environments must use this
-version to ensure consistent behavior across development, CI, and production.
+Lemello Backend is standardized on **Python 3.14**. All contributors and environments must use this version to ensure consistent behavior across development, CI, and production.
 
 ### Why Python 3.14?
 
-Python 3.14 introduces **Free-Threading (No GIL)**, which enables true parallel processing. For
-ChefAI's "Creation Studio," this means:
+Python 3.14 introduces **Free-Threading (No GIL)**, which enables true parallel processing. For Lemello's Creation Studio, this means:
 
 - Parallel handling of WebSocket chat I/O and JSON serialization
 - Elimination of UI jitter during the "Finalizing" phase
@@ -70,8 +84,7 @@ ChefAI's "Creation Studio," this means:
 
 ### Debian / Ubuntu (Recommended: pyenv)
 
-Using `pyenv` is the preferred method on Linux systems. It avoids conflicts with the system Python
-and allows explicit version control.
+Using `pyenv` is the preferred method on Linux systems. It avoids conflicts with the system Python and allows explicit version control.
 
 #### Install system dependencies
 
@@ -217,8 +230,8 @@ poetry --version
 ### Clone the repository
 
 ```bash
-git clone <repo-url>
-cd chefai-backend
+git clone git@github.com:lemello-app/backend.git
+cd backend
 ```
 
 ### Install dependencies
@@ -245,8 +258,7 @@ poetry run uvicorn app.main:app --reload
 
 ## Containerization
 
-The backend uses a multi-stage Docker build to produce lean, immutable images suitable for the
-"Build Once, Deploy Twice" deployment strategy.
+The backend uses a multi-stage Docker build to produce lean, immutable images suitable for the "Build Once, Deploy Twice" deployment strategy.
 
 ### Dockerfile Architecture
 
@@ -264,13 +276,13 @@ FROM python:3.14-slim AS runtime
 ### Building the Container
 
 ```bash
-docker build -t chefai-backend:latest .
+docker build -t lemello-backend:latest .
 ```
 
 ### Running Locally with Docker
 
 ```bash
-docker run -p 8000:8000 --env-file .env chefai-backend:latest
+docker run -p 8000:8000 --env-file .env lemello-backend:latest
 ```
 
 ---
@@ -281,13 +293,11 @@ When deploying to DigitalOcean App Platform, keep these constraints in mind:
 
 ### Ephemeral Filesystem
 
-App Platform containers have ephemeral file systems. Any data written to disk is lost upon
-deployment or restart. The FastAPI application must be **stateless**.
+App Platform containers have ephemeral file systems. Any data written to disk is lost upon deployment or restart. The FastAPI application must be **stateless**.
 
 ### Logging
 
-Logs must be streamed to `stdout`/`stderr` for App Platform's logging agent. Configure Uvicorn
-to use a JSON logging formatter for structured logging:
+Logs must be streamed to `stdout`/`stderr` for App Platform's logging agent. Configure Uvicorn to use a JSON logging formatter for structured logging:
 
 ```python
 import logging
@@ -304,16 +314,7 @@ class JSONFormatter(logging.Formatter):
 
 ### Shared Memory
 
-AI libraries may use `/dev/shm` for shared memory. If you encounter `Bus error`, configure
-data loaders with `num_workers=0` or limit batch sizes to fit within RAM allocation.
-
----
-
-## Project Structure
-
-```text
-TBD
-```
+AI libraries may use `/dev/shm` for shared memory. If you encounter `Bus error`, configure data loaders with `num_workers=0` or limit batch sizes to fit within RAM allocation.
 
 ---
 
@@ -331,8 +332,7 @@ TBD
 
 ### PostgreSQL 16 with pgvector
 
-ChefAI uses DigitalOcean Managed PostgreSQL 16 with the `pgvector` extension for vector similarity
-search. For large-scale deployments (4M+ recipes), consider:
+Lemello uses DigitalOcean Managed PostgreSQL 16 with the `pgvector` extension for vector similarity search. For large-scale deployments (4M+ recipes), consider:
 
 - **Binary Quantization:** Reduces memory footprint by 32x
 - **pgvectorscale:** DiskANN-inspired indexing for disk-resident indexes
@@ -358,28 +358,11 @@ DATABASE_URL=postgresql://user:password@host:port/dbname?sslmode=require
 
 ---
 
-## Suggested Additions
-
-Consider adding the following sections as the project matures:
-
-- [ ] **API Documentation:** Link to auto-generated OpenAPI/Swagger docs
-- [ ] **Testing:** Instructions for running unit and integration tests
-- [ ] **CI/CD Pipeline:** GitHub Actions workflow documentation
-- [ ] **Monitoring:** Logging and observability setup
-- [ ] **WebSocket Configuration:** Details for the Creation Studio real-time features
-- [ ] **LLM Gateway:** Configuration for the OpenAI adapter
-
----
-
 ## License
 
-Do NOT modify or remove this copyright and confidentiality notice.
+**Copyright © Lemello, LLC. All rights reserved.**
 
-**Copyright © Nikolai Alexander. All rights reserved.**
-
-The code contained herein is CONFIDENTIAL to Nikolai Alexander. Portions
+The code contained herein is CONFIDENTIAL to Lemello, LLC. Portions
 may also be trade secret. Any use, duplication, derivation, distribution or
 disclosure of this code, for any reason, not expressly authorized in writing
-by Nikolai Alexander is prohibited. All rights are expressly reserved by Nikolai Alexander.
-
----
+by Lemello, LLC is prohibited. All rights are expressly reserved by Lemello, LLC.
