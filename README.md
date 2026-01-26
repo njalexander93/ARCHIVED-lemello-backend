@@ -242,11 +242,30 @@ poetry install
 
 ### Environment configuration
 
-Copy the environment template and fill in values:
+See the Environment Setup section below for `.env` configuration.
+
+## Environment Setup
+
+1. Copy the environment template:
 
 ```bash
 cp .env.template .env
 ```
+
+2. Configure required values:
+
+| Variable | Description | How to Get |
+|----------|-------------|------------|
+| `SECRET_KEY` | JWT signing key | `openssl rand -hex 32` |
+| `OPENAI_API_KEY` | OpenAI API key for model access | [OpenAI API Keys](https://platform.openai.com/api-keys) |
+| `DATABASE_URL` | Postgres connection string | Match infra `POSTGRES_*` values |
+| `REDIS_URL` | Redis connection string | Match infra `REDIS_*` values |
+
+3. Pydantic nested settings use `__` as a delimiter:
+
+- Example: `AI__MODEL` maps to `settings.ai.model`
+
+4. See `.env.template` for the full list of defaults and options.
 
 ### Run the development server
 
