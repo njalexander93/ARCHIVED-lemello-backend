@@ -1,0 +1,52 @@
+# Pre-commit hooks for Lemello Backend
+# See https://pre-commit.com for more information
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: mixed-line-ending
+
+  # Ruff - linting and formatting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      # Run the linter
+      - id: ruff
+        args: [--fix]
+      # Run the formatter
+      - id: ruff-format
+
+  # mypy - type checking
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        additional_dependencies: [
+          fastapi,
+          pydantic,
+          pydantic-settings,
+          types-pyyaml
+        ]
+        args: [--config-file=pyproject.toml]
+
+  # pytest - run fast unit tests on commit
+  - repo: local
+    hooks:
+      - id: pytest-unit
+        name: pytest unit tests
+        entry: poetry run pytest tests/unit/ -x
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]

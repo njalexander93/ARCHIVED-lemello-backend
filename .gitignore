@@ -47,3 +47,5 @@ Thumbs.db
 # Logs
 *.log
 logs/
+# Pre-commit cache
+.pre-commit-cache/
