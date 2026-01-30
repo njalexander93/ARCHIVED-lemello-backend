@@ -1,7 +1,7 @@
 <h1><img src=".github/assets/lemello-horizontal-yellow.svg" alt="Lemello" height="28px"> Backend</h1>
 
-[![GitHub release](https://img.shields.io/github/v/release/yourusername/lemello-backend)](https://github.com/yourusername/lemello-backend/releases)
-[![PR Checks](https://github.com/yourusername/lemello-backend/actions/workflows/pr-checks.yml/badge.svg?branch=main)](https://github.com/yourusername/lemello-backend/actions)
+[![GitHub release](https://img.shields.io/github/v/release/lemello-app/backend)](https://github.com/lemello-app/backend/releases)
+[![Release Pipeline](https://github.com/lemello-app/backend/actions/workflows/release.yml/badge.svg)](https://github.com/lemello-app/backend/actions/workflows/release.yml)
 [![Python](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Proprietary-red)](#license)
 
