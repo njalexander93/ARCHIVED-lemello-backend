@@ -15,24 +15,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR title format
-        uses: amannn/action-semantic-pull-request@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          types: |
-            feat
-            fix
-            docs
-            test
-            refactor
-            chore
-            ci
-          requireScope: false
-          subjectPattern: ^[A-Z].+$
-          subjectPatternError: |
-            The subject "{subject}" found in the pull request title "{title}"
-            didn't match the configured pattern. Please ensure that the subject
-            starts with an uppercase character.
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+
+          # Check format: [LMLO-XXX] Description starting with capital
+          if ! echo "$TITLE" | grep -qE '^\[LMLO-[0-9]+\] [A-Z]'; then
+            echo "❌ PR title must match format: [LMLO-XXX] Description"
+            echo "   - Must start with [LMLO-XXX] where XXX is a number"
+            echo "   - Must have space after closing bracket"
+            echo "   - Description must start with capital letter"
+            echo ""
+            echo "Your title: $TITLE"
+            exit 1
+          fi
+
+          echo "✅ PR title format is valid"
 
   label-check:
     name: Label Check
