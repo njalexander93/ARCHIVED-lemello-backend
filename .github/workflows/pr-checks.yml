@@ -40,7 +40,7 @@ jobs:
         with:
           mode: minimum
           count: 1
-          labels: "bug, feature, enhancement, documentation, chore, dependencies"
+          labels: "Bug, Documentation, Feature, Improvement, Spike, Task, Vulnerability"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
