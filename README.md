@@ -30,7 +30,7 @@ Built with **FastAPI** following modern Python, security, and DevSecOps best pra
 ## Requirements
 
 - **Python 3.14.x** (Free-Threaded build recommended for production)
-- Poetry
+- **uv** (for fast dependency management)
 - PostgreSQL 16 (with pgvector)
 - Redis (optional for local development)
 - Docker (for containerized deployment)
@@ -207,21 +207,29 @@ Python 3.14.x
 
 ---
 
-## Installing Poetry
+## Installing uv
 
-Poetry is used for dependency and virtual environment management.
+uv is a fast Rust-based package manager used for dependency and virtual environment management.
 
-Install Poetry after Python 3.14 is available:
+Install uv after Python 3.14 is available:
 
 ```bash
-curl -sSL https://install.python-poetry.org | python -
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 Verify:
 
 ```bash
-poetry --version
+uv --version
+# Expected: uv 0.9.x or later
 ```
+
+### Why uv?
+
+- **10-100x faster** than pip/Poetry
+- **Full Python 3.14 support** with no compatibility issues
+- **Drop-in replacement** for pip with better dependency resolution
+- **Production-ready** lock files that work correctly with Python 3.14
 
 ---
 
@@ -237,7 +245,7 @@ cd backend
 ### Install dependencies
 
 ```bash
-poetry install
+uv sync --all-extras
 ```
 
 ### Environment configuration
@@ -270,7 +278,13 @@ cp .env.template .env
 ### Run the development server
 
 ```bash
-poetry run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
+```
+
+Or use the Makefile:
+
+```bash
+make dev
 ```
 
 ---
@@ -340,10 +354,11 @@ AI libraries may use `/dev/shm` for shared memory. If you encounter `Bus error`,
 ## Dependency Management
 
 - Dependencies are defined in `pyproject.toml`
-- Exact versions are locked in `poetry.lock`
-- `poetry.lock` **must be committed**
+- Exact versions are locked in `uv.lock`
+- `uv.lock` **must be committed**
 - Virtual environments **must not** be committed
 - All dependencies must be **Pydantic v2 compliant**
+- `.python-version` file pins Python 3.14 for the project
 
 ---
 

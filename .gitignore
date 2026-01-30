@@ -17,8 +17,8 @@ venv/
 ENV/
 *env/
 
-# Poetry
-.cache/pypoetry/
+# uv cache (optional - usually in global cache)
+.uv_cache/
 
 # Environment / Secrets
 .env

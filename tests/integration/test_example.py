@@ -12,13 +12,17 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-client = TestClient(app)
+
+@pytest.fixture
+def test_client() -> TestClient:
+    """Create a fresh TestClient for each test."""
+    return TestClient(app)
 
 
 @pytest.mark.integration
-def test_root_endpoint_returns_json() -> None:
+def test_root_endpoint_returns_json(test_client: TestClient) -> None:
     """Test root endpoint returns valid JSON response."""
-    response = client.get("/")
+    response = test_client.get("/")
     assert response.status_code == 200
     assert "application/json" in response.headers["content-type"]
 

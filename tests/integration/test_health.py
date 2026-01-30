@@ -5,21 +5,25 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
-client = TestClient(app)
+
+@pytest.fixture
+def test_client() -> TestClient:
+    """Create a fresh TestClient for each test."""
+    return TestClient(app)
 
 
 @pytest.mark.integration
-def test_health_check() -> None:
+def test_health_check(test_client: TestClient) -> None:
     """Test the health check endpoint returns 200."""
-    response = client.get("/health")
+    response = test_client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
 
 @pytest.mark.integration
-def test_root_endpoint() -> None:
+def test_root_endpoint(test_client: TestClient) -> None:
     """Test the root endpoint returns API info."""
-    response = client.get("/")
+    response = test_client.get("/")
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "Lemello Backend API"
