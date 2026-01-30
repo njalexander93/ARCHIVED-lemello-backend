@@ -44,6 +44,41 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  version-check:
+    name: Version Duplicate Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found version: $VERSION"
+
+      - name: Check if release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" --repo ${{ github.repository }} &>/dev/null; then
+            echo "❌ Release v$VERSION already exists!"
+            echo ""
+            echo "To bump the version:"
+            echo "  1. Edit backend/pyproject.toml line 3"
+            echo "  2. Change version to next patch/minor/major"
+            echo "  3. Commit: git commit -am 'Bump version to X.Y.Z'"
+            echo ""
+            echo "Version format: MAJOR.MINOR.PATCH"
+            echo "  - PATCH (0.1.0 -> 0.1.1): Bug fixes"
+            echo "  - MINOR (0.1.0 -> 0.2.0): New features (backward compatible)"
+            echo "  - MAJOR (0.1.0 -> 1.0.0): Breaking changes"
+            exit 1
+          fi
+          echo "✅ Version v$VERSION is unique"
+
   test-suite:
     name: Lint, Type Check, and Tests
     runs-on: ubuntu-latest

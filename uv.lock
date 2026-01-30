@@ -33,44 +33,6 @@ wheels = [
 ]
 
 [[package]]
-name = "backend"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "fastapi" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "httpx" },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-watch" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.128.0,<0.129.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.1" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.5.1" },
-    { name = "pydantic", specifier = ">=2.12.5,<3.0.0" },
-    { name = "pydantic-settings", specifier = ">=2.12.0,<3.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-watch", marker = "extra == 'dev'", specifier = ">=4.2.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.14" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0,<0.41.0" },
-]
-provides-extras = ["dev"]
-
-[[package]]
 name = "certifi"
 version = "2026.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -261,6 +223,44 @@ sdist = { url = "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl", hash = "sha256:f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12", size = 7484, upload-time = "2025-10-18T21:55:41.639Z" },
 ]
+
+[[package]]
+name = "lemello-backend"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "httpx" },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-watch" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.128.0,<0.129.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.1" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.5.1" },
+    { name = "pydantic", specifier = ">=2.12.5,<3.0.0" },
+    { name = "pydantic-settings", specifier = ">=2.12.0,<3.0.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "pytest-watch", marker = "extra == 'dev'", specifier = ">=4.2.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.14" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0,<0.41.0" },
+]
+provides-extras = ["dev"]
 
 [[package]]
 name = "librt"

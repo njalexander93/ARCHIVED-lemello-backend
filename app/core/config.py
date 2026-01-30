@@ -19,14 +19,19 @@ class Environment(str, Enum):
     PRODUCTION = "production"
 
     @classmethod
-    def _missing_(cls, value: object) -> "Environment":
-        """Handle case-insensitive lookup of environment values."""
+    def _missing_(cls, value: object) -> Optional["Environment"]:
+        """Handle case-insensitive lookup of environment values.
+
+        Returns:
+            The matching Environment member for a case-insensitive value,
+            or None if the value is invalid so that validation fails fast.
+        """
         if isinstance(value, str):
             value = value.lower()
             for member in cls:
                 if member.value.lower() == value:
                     return member
-        return cls.DEVELOPMENT
+        return None
 
 
 class Settings(BaseSettings):
@@ -128,10 +133,7 @@ class Settings(BaseSettings):
         """
         app_env = info.data.get("app_env", Environment.DEVELOPMENT)
 
-        if (
-            app_env == Environment.PRODUCTION
-            and v == "change_me_generate_with_openssl_dev_only"
-        ):
+        if app_env == Environment.PRODUCTION and v.startswith("change_me"):
             raise ValueError(
                 "SECRET_KEY must be set for production environment. "
                 "Generate one with: openssl rand -hex 32"

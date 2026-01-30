@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Install uv (pinned version for reproducible builds)
+COPY --from=ghcr.io/astral-sh/uv:0.9.28 /uv /usr/local/bin/uv
 
 # Enable bytecode compilation
 ENV UV_COMPILE_BYTECODE=1 \
@@ -24,6 +24,9 @@ ENV UV_COMPILE_BYTECODE=1 \
 
 # Copy dependency files and README (required by hatchling)
 COPY pyproject.toml uv.lock README.md ./
+
+# Copy application source so local project can be installed by uv
+COPY app/ ./app/
 
 # Install dependencies (without dev dependencies for production)
 RUN uv sync --frozen --no-dev --no-editable
@@ -55,8 +58,7 @@ USER appuser
 EXPOSE 8000
 
 # Run with uvicorn in reload mode for hot reload
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", \
-     "--reload", "--reload-dir", "/app/app"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app"]
 
 # -----------------------------------------------------------------------------
 # Stage 3: Production - Lean runtime image

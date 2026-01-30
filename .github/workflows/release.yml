@@ -1,0 +1,97 @@
+name: Release Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+
+permissions:
+  contents: write  # For creating releases and tags
+  packages: write  # For pushing to GHCR
+
+jobs:
+  test:
+    name: Full Test Suite
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen --all-extras
+
+      - name: Run unit tests
+        run: uv run pytest tests/unit/ -v
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -v
+
+      - name: Run e2e tests
+        run: uv run pytest tests/e2e/ -v
+
+  build-and-release:
+    name: Build and Release
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/lemello-backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/lemello-backend:latest
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --notes "## Release v${{ steps.version.outputs.version }}
+
+            ### Docker Images
+            \`\`\`
+            docker pull ghcr.io/${{ github.repository_owner }}/lemello-backend:${{ steps.version.outputs.version }}
+            \`\`\`
+
+            ### Changes
+            See commit history for details." \
+            --repo ${{ github.repository }}

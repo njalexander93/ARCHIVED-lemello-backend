@@ -27,29 +27,29 @@ tests/
 
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run specific test types
-poetry run pytest tests/unit/
-poetry run pytest tests/integration/
-poetry run pytest tests/e2e/
+uv run pytest tests/unit/
+uv run pytest tests/integration/
+uv run pytest tests/e2e/
 
 # Run by marker
-poetry run pytest -m unit
-poetry run pytest -m integration
-poetry run pytest -m "not slow"
+uv run pytest -m unit
+uv run pytest -m integration
+uv run pytest -m "not slow"
 
 # Run with verbose output
-poetry run pytest -v
+uv run pytest -v
 
 # Run with coverage report
-poetry run pytest --cov=app --cov-report=html
+uv run pytest --cov=app --cov-report=html
 
 # Run specific test file
-poetry run pytest tests/integration/test_health.py
+uv run pytest tests/integration/test_health.py
 
 # Run specific test function
-poetry run pytest tests/integration/test_health.py::test_health_check
+uv run pytest tests/integration/test_health.py::test_health_check
 ```
 
 ## Writing Tests
@@ -111,17 +111,17 @@ Tests can be marked with decorators for selective running:
 
 **Pre-commit hook:**
 ```bash
-poetry run pytest tests/unit/ -x
+uv run pytest tests/unit/ -x
 ```
 
 **Pre-push hook:**
 ```bash
-poetry run pytest tests/unit/ tests/integration/
+uv run pytest tests/unit/ tests/integration/
 ```
 
 **CI Pipeline:**
 ```bash
-poetry run pytest  # All tests including e2e
+uv run pytest  # All tests including e2e
 ```
 
 ## Coverage Goals

@@ -1,5 +1,9 @@
 <h1><img src=".github/assets/lemello-horizontal-yellow.svg" alt="Lemello" height="28px"> Backend</h1>
 
+[![GitHub release](https://img.shields.io/github/v/release/yourusername/lemello-backend)](https://github.com/yourusername/lemello-backend/releases)
+[![PR Checks](https://github.com/yourusername/lemello-backend/actions/workflows/pr-checks.yml/badge.svg?branch=main)](https://github.com/yourusername/lemello-backend/actions)
+[![Python](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-Proprietary-red)](#license)
 
 The core service layer for Lemello — an AI-powered cooking platform that transforms nervous recipe-followers into confident recipe-creators.
 
@@ -30,7 +34,7 @@ Built with **FastAPI** following modern Python, security, and DevSecOps best pra
 ## Requirements
 
 - **Python 3.14.x** (Free-Threaded build recommended for production)
-- **uv** (for fast dependency management)
+- **uv 0.9.28+** (for fast dependency management)
 - PostgreSQL 16 (with pgvector)
 - Redis (optional for local development)
 - Docker (for containerized deployment)
@@ -221,7 +225,7 @@ Verify:
 
 ```bash
 uv --version
-# Expected: uv 0.9.x or later
+# Expected: uv 0.9.28 or later
 ```
 
 ### Why uv?
@@ -378,6 +382,56 @@ The database URL is provided via environment variable:
 
 ```env
 DATABASE_URL=postgresql://user:password@host:port/dbname?sslmode=require
+```
+
+---
+
+## Releasing
+
+### Version Management
+
+This project uses semantic versioning (`MAJOR.MINOR.PATCH`):
+- **PATCH** (0.1.0 → 0.1.1): Bug fixes, documentation updates
+- **MINOR** (0.1.0 → 0.2.0): New features (backward compatible)
+- **MAJOR** (0.1.0 → 1.0.0): Breaking changes
+
+### Bumping the Version
+
+**Manual version bump** (edit `pyproject.toml`):
+
+```bash
+# Edit backend/pyproject.toml line 3
+version = "0.1.1"  # Change to your new version
+
+# Commit the version bump
+git add pyproject.toml
+git commit -m "Bump version to 0.1.1"
+```
+
+### Release Workflow
+
+The CI/CD pipeline automatically handles releases:
+
+1. **PR Stage**: Version uniqueness is checked
+   - If version already exists, PR check fails with instructions
+   - Ensures no duplicate releases
+
+2. **Post-Merge**: Automatic release on merge to `main`
+   - Runs full test suite (unit + integration + e2e)
+   - Builds production Docker image
+   - Pushes to GitHub Container Registry
+   - Creates GitHub Release with tag `backend-v{version}`
+
+### Deployment
+
+Pull the released Docker image:
+
+```bash
+# Specific version
+docker pull ghcr.io/yourusername/lemello-backend:0.1.0
+
+# Latest
+docker pull ghcr.io/yourusername/lemello-backend:latest
 ```
 
 ---
