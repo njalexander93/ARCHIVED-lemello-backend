@@ -41,14 +41,16 @@ WORKDIR /app
 # Copy uv from builder
 COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
 
-# Copy virtual environment from builder
-COPY --from=builder --chown=root:root /app/.venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH" \
-    VIRTUAL_ENV="/app/.venv"
-
-# Copy project files
+# Copy project files first for reinstall with dev dependencies
 COPY pyproject.toml uv.lock README.md ./
 COPY app/ ./app/
+
+# Install ALL dependencies including dev tools (pytest, ruff, mypy)
+RUN uv sync --frozen --all-extras
+
+# Set environment variables for virtual environment
+ENV PATH="/app/.venv/bin:$PATH" \
+    VIRTUAL_ENV="/app/.venv"
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
