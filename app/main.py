@@ -50,8 +50,13 @@ if settings.app_env == Environment.PRODUCTION:
         "https://www.lemello.com",
         "https://app.lemello.com",
     ]
-else:
-    # Development and staging allow localhost
+elif settings.app_env == Environment.STAGING:
+    cors_origins = [
+        "https://staging.lemello.com",
+        "http://localhost:3000",  # Allow local dev against staging API
+        "http://127.0.0.1:3000",
+    ]
+else:  # Development
     cors_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
