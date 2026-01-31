@@ -71,8 +71,8 @@ jobs:
           target: production
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/lemello-backend:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/lemello-backend:latest
+            ghcr.io/${{ github.repository_owner }}/backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/backend:latest
 
       - name: Create GitHub Release
         env:
@@ -84,7 +84,7 @@ jobs:
 
             ### Docker Images
             \`\`\`
-            docker pull ghcr.io/${{ github.repository_owner }}/lemello-backend:${{ steps.version.outputs.version }}
+            docker pull ghcr.io/${{ github.repository_owner }}/backend:${{ steps.version.outputs.version }}
             \`\`\`
 
             ### Changes
