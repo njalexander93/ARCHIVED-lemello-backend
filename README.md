@@ -53,6 +53,12 @@ Built with **FastAPI** following modern Python, security, and DevSecOps best pra
 
 ---
 
+## Code Style
+
+- [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
+
+---
+
 ## Deployment Target
 
 Lemello Backend is deployed on **DigitalOcean App Platform** using containerized deployments.
