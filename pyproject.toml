@@ -92,4 +92,4 @@ markers = [
 ]
 
 # Default: run all tests with coverage
-addopts = "-ra -q --cov=app --cov-report=term-missing"
+addopts = "-ra --cov=app --cov-report=term-missing"
