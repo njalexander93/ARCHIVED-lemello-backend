@@ -51,15 +51,6 @@ clean:  ## Remove cache and temporary files
 dev:  ## Run development server with hot reload
 	uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-docker-up:  ## Start Docker containers
-	docker compose up -d
-
-docker-down:  ## Stop Docker containers
-	docker compose down
-
-docker-logs:  ## Show Docker container logs
-	docker compose logs -f backend
-
 ci:  ## Run all CI checks (lint, type-check, test)
 	@echo "Running CI checks..."
 	@make format-check

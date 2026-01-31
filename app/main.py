@@ -43,13 +43,23 @@ else:
         ],
     )
 
-# Configure CORS for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Configure CORS based on environment
+if settings.app_env == Environment.PRODUCTION:
+    cors_origins = [
+        "https://lemello.com",
+        "https://www.lemello.com",
+        "https://app.lemello.com",
+    ]
+else:
+    # Development and staging allow localhost
+    cors_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
     allow_headers=["Content-Type", "Authorization"],
