@@ -75,9 +75,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 @pytest.mark.integration
-def test_create_recipe():
+def test_create_recipe(test_client: TestClient):
     """Test recipe creation endpoint."""
-    response = client.post("/recipes", json={
+    response = test_client.post("/recipes", json={
         "title": "Test Recipe",
         "ingredients": ["salt", "pepper"]
     })
@@ -111,12 +111,7 @@ Tests can be marked with decorators for selective running:
 
 **Pre-commit hook:**
 ```bash
-uv run pytest tests/unit/ -x
-```
-
-**Pre-commit hook:**
-```bash
-uv run pytest tests/unit/  # Fast unit tests only
+uv run pytest tests/unit/ -x  # Fast unit tests, fail-fast mode
 ```
 
 **CI Pipeline (PR checks):**

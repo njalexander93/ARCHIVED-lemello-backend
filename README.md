@@ -273,9 +273,9 @@ cp .env.template .env
 | `DATABASE_URL` | Postgres connection string | Match infra `POSTGRES_*` values |
 | `REDIS_URL` | Redis connection string | Match infra `REDIS_*` values |
 
-3. Pydantic nested settings use `__` as a delimiter:
+3. Environment variables with double underscores (`__`) in Pydantic map to flat fields:
 
-- Example: `AI__MODEL` maps to `settings.ai.model`
+- Example: `AI__MODEL` env var maps to `settings.ai_model` field
 
 4. See `.env.template` for the full list of defaults and options.
 

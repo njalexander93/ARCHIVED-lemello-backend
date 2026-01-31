@@ -22,7 +22,6 @@ app = FastAPI(
 )
 
 # Configure trusted hosts (prevents host header injection)
-# In development, allow testserver for TestClient
 if settings.app_env == Environment.PRODUCTION:
     app.add_middleware(
         TrustedHostMiddleware,
@@ -31,7 +30,15 @@ if settings.app_env == Environment.PRODUCTION:
             "lemello.com",
         ],
     )
-else:
+elif settings.app_env == Environment.STAGING:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=[
+            "*.lemello.com",
+            "lemello.com",
+        ],
+    )
+else:  # Development
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=[
