@@ -28,17 +28,15 @@ repos:
       - id: ruff-format
 
   # mypy - type checking
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+  - repo: local
     hooks:
       - id: mypy
-        additional_dependencies: [
-          fastapi,
-          pydantic,
-          pydantic-settings,
-          types-pyyaml
-        ]
-        args: [--config-file=pyproject.toml]
+        name: mypy type checking
+        entry: uv run mypy --config-file=pyproject.toml
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
 
   # pytest - run fast unit tests on commit
   - repo: local
