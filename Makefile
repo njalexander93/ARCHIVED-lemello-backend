@@ -19,9 +19,6 @@ test-unit:  ## Run only unit tests (fast)
 test-integration:  ## Run only integration tests
 	uv run pytest tests/integration/ -v
 
-test-watch:  ## Run tests in watch mode (re-run on changes)
-	uv run ptw --runner "uv run pytest"
-
 lint:  ## Run ruff linter
 	uv run ruff check app/ tests/
 
