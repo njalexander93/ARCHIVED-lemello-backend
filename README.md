@@ -420,7 +420,7 @@ The CI/CD pipeline automatically handles releases:
    - Runs full test suite (unit + integration + e2e)
    - Builds production Docker image
    - Pushes to GitHub Container Registry
-   - Creates GitHub Release with tag `backend-v{version}`
+   - Creates GitHub Release with tag `v{version}`
 
 ### Deployment
 

@@ -104,5 +104,5 @@ async def root() -> dict[str, str]:
     return {
         "name": "Lemello Backend API",
         "version": __version__,
-        "environment": settings.app_env,
+        "environment": settings.app_env.value,
     }
