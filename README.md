@@ -428,10 +428,10 @@ Pull the released Docker image:
 
 ```bash
 # Specific version
-docker pull ghcr.io/yourusername/lemello-backend:0.1.0
+docker pull ghcr.io/lemello-app/backend:0.1.0
 
 # Latest
-docker pull ghcr.io/yourusername/lemello-backend:latest
+docker pull ghcr.io/lemello-app/backend:latest
 ```
 
 ---

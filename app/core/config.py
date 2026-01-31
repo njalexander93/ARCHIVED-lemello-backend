@@ -133,7 +133,9 @@ class Settings(BaseSettings):
         """
         app_env = info.data.get("app_env", Environment.DEVELOPMENT)
 
-        if app_env == Environment.PRODUCTION and v.startswith("change_me"):
+        if app_env == Environment.PRODUCTION and v.lower().startswith(
+            "change_me"
+        ):
             raise ValueError(
                 "SECRET_KEY must be set for production environment. "
                 "Generate one with: openssl rand -hex 32"

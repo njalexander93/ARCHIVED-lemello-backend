@@ -10,14 +10,6 @@ Integration tests should:
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-
-@pytest.fixture
-def test_client() -> TestClient:
-    """Create a fresh TestClient for each test."""
-    return TestClient(app)
-
 
 @pytest.mark.integration
 def test_root_endpoint_returns_json(test_client: TestClient) -> None:

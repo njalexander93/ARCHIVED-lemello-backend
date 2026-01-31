@@ -54,7 +54,7 @@ jobs:
       - name: Extract version from pyproject.toml
         id: version
         run: |
-          VERSION=$(grep '^version = ' backend/pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Found version: $VERSION"
 
@@ -67,7 +67,7 @@ jobs:
             echo "❌ Release v$VERSION already exists!"
             echo ""
             echo "To bump the version:"
-            echo "  1. Edit backend/pyproject.toml line 3"
+            echo "  1. Edit pyproject.toml line 3"
             echo "  2. Change version to next patch/minor/major"
             echo "  3. Commit: git commit -am 'Bump version to X.Y.Z'"
             echo ""

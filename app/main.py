@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
+from app import __version__
 from app.core.config import Environment, settings
 from app.routers import health
 
@@ -16,7 +17,7 @@ from app.routers import health
 app = FastAPI(
     title="Lemello Backend API",
     description="AI-powered cooking assistant and recipe creation platform",
-    version="0.1.0",
+    version=__version__,
     debug=settings.app_debug,
 )
 
@@ -102,6 +103,6 @@ async def root() -> dict[str, str]:
     """
     return {
         "name": "Lemello Backend API",
-        "version": "0.1.0",
+        "version": __version__,
         "environment": settings.app_env,
     }
