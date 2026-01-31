@@ -1,7 +1,7 @@
 # Lemello Backend - Development Commands
 # Usage: make <target>
 
-PHONY: help install test test-unit test-integration lint format format-check type-check pre-commit pre-commit-update clean dev ci
+.PHONY: help install test test-unit test-integration lint format format-check type-check pre-commit pre-commit-update clean dev ci
 
 help:  ## Show this help message
 	@echo "Lemello Backend - Available commands:"

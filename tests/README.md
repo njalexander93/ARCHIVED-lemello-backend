@@ -114,12 +114,17 @@ Tests can be marked with decorators for selective running:
 uv run pytest tests/unit/ -x
 ```
 
-**Pre-push hook:**
+**Pre-commit hook:**
 ```bash
-uv run pytest tests/unit/ tests/integration/
+uv run pytest tests/unit/  # Fast unit tests only
 ```
 
-**CI Pipeline:**
+**CI Pipeline (PR checks):**
+```bash
+uv run pytest tests/unit/ tests/integration/  # Unit + integration tests
+```
+
+**Release Pipeline:**
 ```bash
 uv run pytest  # All tests including e2e
 ```

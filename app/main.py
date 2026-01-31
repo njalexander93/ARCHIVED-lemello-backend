@@ -37,6 +37,7 @@ else:
         allowed_hosts=[
             "localhost",
             "127.0.0.1",
+            "0.0.0.0",  # Docker container bind
             "testserver",  # For TestClient
             "*.lemello.com",
             "lemello.com",

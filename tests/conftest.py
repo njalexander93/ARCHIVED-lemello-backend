@@ -4,6 +4,8 @@ This module contains fixtures that are available across all test suites
 (unit, integration, and e2e tests).
 """
 
+from collections.abc import Iterator
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -11,10 +13,11 @@ from app.main import app
 
 
 @pytest.fixture
-def test_client() -> TestClient:
+def test_client() -> Iterator[TestClient]:
     """Create a fresh TestClient for each test.
 
-    Returns:
+    Yields:
         TestClient configured with the FastAPI app.
     """
-    return TestClient(app)
+    with TestClient(app) as client:
+        yield client
