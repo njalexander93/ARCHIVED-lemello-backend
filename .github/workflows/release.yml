@@ -3,6 +3,13 @@ name: Release Pipeline
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'           # Skip markdown files (README, docs)
+      - 'docs/**'         # Skip docs directory
+      - 'scripts/**'      # Skip utility/test scripts
+      - '.github/**'      # Skip workflow changes (use separate workflow for that)
+      - 'LICENSE'         # Skip license changes
+      - '.gitignore'      # Skip gitignore changes
 
 # Prevent concurrent releases - queue them instead
 concurrency:

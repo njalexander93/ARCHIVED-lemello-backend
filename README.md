@@ -376,8 +376,44 @@ AI libraries may use `/dev/shm` for shared memory. If you encounter `Bus error`,
 
 ### PostgreSQL 16 with pgvector
 
-Lemello uses DigitalOcean Managed PostgreSQL 16 with the `pgvector` extension for vector similarity search. For large-scale deployments (4M+ recipes), consider:
+Lemello uses DigitalOcean Managed PostgreSQL 16 with the `pgvector` extension for vector similarity search.
 
+**Verified Configuration:**
+- **PostgreSQL Version:** 16
+- **pgvector Version:** 0.8.1 (verified 2026-02-01)
+- **Tested with:** 1 GB RAM (DigitalOcean Basic Plan)
+- **MVP Capacity:** 1,000-1,500 recipes + theory cards (~18 MB)
+
+**Verification Commands:**
+```sql
+-- Create extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Verify installation
+SELECT extname, extversion FROM pg_extension WHERE extname = 'vector';
+
+-- Create test table with 1536-dimensional vectors
+CREATE TABLE recipes_test (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    embedding VECTOR(1536)
+);
+
+-- Insert sample data
+INSERT INTO recipes_test (name, embedding)
+VALUES ('Test Recipe', array_fill(0.1, ARRAY[1536])::vector);
+
+-- Test vector similarity search
+SELECT id, name,
+       embedding <=> array_fill(0.15, ARRAY[1536])::vector AS distance
+FROM recipes_test
+ORDER BY distance
+LIMIT 5;
+```
+
+**Scaling Considerations:**
+
+For large-scale deployments (500K+ recipes), consider:
 - **Binary Quantization:** Reduces memory footprint by 32x
 - **pgvectorscale:** DiskANN-inspired indexing for disk-resident indexes
 - **Scalar Quantization:** Half-precision fallback if Binary Quantization yields poor recall
