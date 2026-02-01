@@ -51,7 +51,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check for code changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'app/**'
+              - 'tests/**'
+              - 'pyproject.toml'
+              - 'Dockerfile'
+              - 'uv.lock'
+
       - name: Extract version from pyproject.toml
+        if: steps.filter.outputs.code == 'true'
         id: version
         run: |
           VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
@@ -59,6 +72,7 @@ jobs:
           echo "Found version: $VERSION"
 
       - name: Check if release exists
+        if: steps.filter.outputs.code == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -78,6 +92,11 @@ jobs:
             exit 1
           fi
           echo "✅ Version v$VERSION is unique"
+
+      - name: Skip version check for docs-only changes
+        if: steps.filter.outputs.code == 'false'
+        run: |
+          echo "✅ Only documentation/scripts changed - version check skipped"
 
   test-suite:
     name: Lint, Type Check, and Tests
