@@ -1,5 +1,9 @@
 <h1><img src=".github/assets/lemello-horizontal-yellow.svg" alt="Lemello" height="28px"> Backend</h1>
 
+[![GitHub release](https://img.shields.io/github/v/release/lemello-app/backend)](https://github.com/lemello-app/backend/releases)
+[![CI/CD](https://github.com/lemello-app/backend/actions/workflows/release.yml/badge.svg)](https://github.com/lemello-app/backend/actions/workflows/release.yml)
+[![Python](https://img.shields.io/badge/python-3.14-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-Proprietary-red)](#license)
 
 The core service layer for Lemello — an AI-powered cooking platform that transforms nervous recipe-followers into confident recipe-creators.
 
@@ -30,7 +34,7 @@ Built with **FastAPI** following modern Python, security, and DevSecOps best pra
 ## Requirements
 
 - **Python 3.14.x** (Free-Threaded build recommended for production)
-- Poetry
+- **uv 0.9.28+** (for fast dependency management)
 - PostgreSQL 16 (with pgvector)
 - Redis (optional for local development)
 - Docker (for containerized deployment)
@@ -46,6 +50,12 @@ Built with **FastAPI** following modern Python, security, and DevSecOps best pra
 | **FastAPI**    | Latest  | Stable         | High-performance async web framework                                                   |
 | **Pydantic**   | v2.x    | Stable         | Strict validation with v2 compliance required                                          |
 | **PostgreSQL** | 16      | Stable         | Managed database with pgvector support on DigitalOcean                                 |
+
+---
+
+## Code Style
+
+- [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html)
 
 ---
 
@@ -207,21 +217,29 @@ Python 3.14.x
 
 ---
 
-## Installing Poetry
+## Installing uv
 
-Poetry is used for dependency and virtual environment management.
+uv is a fast Rust-based package manager used for dependency and virtual environment management.
 
-Install Poetry after Python 3.14 is available:
+Install uv after Python 3.14 is available:
 
 ```bash
-curl -sSL https://install.python-poetry.org | python -
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 Verify:
 
 ```bash
-poetry --version
+uv --version
+# Expected: uv 0.9.28 or later
 ```
+
+### Why uv?
+
+- **10-100x faster** than pip/Poetry
+- **Full Python 3.14 support** with no compatibility issues
+- **Drop-in replacement** for pip with better dependency resolution
+- **Production-ready** lock files that work correctly with Python 3.14
 
 ---
 
@@ -237,7 +255,7 @@ cd backend
 ### Install dependencies
 
 ```bash
-poetry install
+uv sync --all-extras
 ```
 
 ### Environment configuration
@@ -261,16 +279,22 @@ cp .env.template .env
 | `DATABASE_URL` | Postgres connection string | Match infra `POSTGRES_*` values |
 | `REDIS_URL` | Redis connection string | Match infra `REDIS_*` values |
 
-3. Pydantic nested settings use `__` as a delimiter:
+3. Environment variables with double underscores (`__`) in Pydantic map to flat fields:
 
-- Example: `AI__MODEL` maps to `settings.ai.model`
+- Example: `AI__MODEL` env var maps to `settings.ai_model` field
 
 4. See `.env.template` for the full list of defaults and options.
 
 ### Run the development server
 
 ```bash
-poetry run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
+```
+
+Or use the Makefile:
+
+```bash
+make dev
 ```
 
 ---
@@ -340,10 +364,11 @@ AI libraries may use `/dev/shm` for shared memory. If you encounter `Bus error`,
 ## Dependency Management
 
 - Dependencies are defined in `pyproject.toml`
-- Exact versions are locked in `poetry.lock`
-- `poetry.lock` **must be committed**
+- Exact versions are locked in `uv.lock`
+- `uv.lock` **must be committed**
 - Virtual environments **must not** be committed
 - All dependencies must be **Pydantic v2 compliant**
+- `.python-version` file pins Python 3.14 for the project
 
 ---
 
@@ -363,6 +388,56 @@ The database URL is provided via environment variable:
 
 ```env
 DATABASE_URL=postgresql://user:password@host:port/dbname?sslmode=require
+```
+
+---
+
+## Releasing
+
+### Version Management
+
+This project uses semantic versioning (`MAJOR.MINOR.PATCH`):
+- **PATCH** (0.1.0 → 0.1.1): Bug fixes, documentation updates
+- **MINOR** (0.1.0 → 0.2.0): New features (backward compatible)
+- **MAJOR** (0.1.0 → 1.0.0): Breaking changes
+
+### Bumping the Version
+
+**Manual version bump** (edit `pyproject.toml`):
+
+```bash
+# Edit backend/pyproject.toml line 3
+version = "0.1.1"  # Change to your new version
+
+# Commit the version bump
+git add pyproject.toml
+git commit -m "Bump version to 0.1.1"
+```
+
+### Release Workflow
+
+The CI/CD pipeline automatically handles releases:
+
+1. **PR Stage**: Version uniqueness is checked
+   - If version already exists, PR check fails with instructions
+   - Ensures no duplicate releases
+
+2. **Post-Merge**: Automatic release on merge to `main`
+   - Runs full test suite (unit + integration + e2e)
+   - Builds production Docker image
+   - Pushes to GitHub Container Registry
+   - Creates GitHub Release with tag `v{version}`
+
+### Deployment
+
+Pull the released Docker image:
+
+```bash
+# Specific version
+docker pull ghcr.io/lemello-app/backend:0.1.0
+
+# Latest
+docker pull ghcr.io/lemello-app/backend:latest
 ```
 
 ---

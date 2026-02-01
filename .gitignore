@@ -17,8 +17,8 @@ venv/
 ENV/
 *env/
 
-# Poetry
-.cache/pypoetry/
+# uv cache (optional - usually in global cache)
+.uv_cache/
 
 # Environment / Secrets
 .env
@@ -47,3 +47,5 @@ Thumbs.db
 # Logs
 *.log
 logs/
+# Pre-commit cache
+.pre-commit-cache/
