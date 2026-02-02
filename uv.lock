@@ -226,6 +226,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "sanitary" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -250,6 +251,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.14" },
+    { name = "sanitary", specifier = ">=0.1.0,<0.2.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0,<0.41.0" },
 ]
 provides-extras = ["dev"]
@@ -541,6 +543,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/aa/9f89c719c467dfaf8ad799b9bae0df494513fb21d31a6059cb5870e57e74/ruff-0.14.14-py3-none-win32.whl", hash = "sha256:b530c191970b143375b6a68e6f743800b2b786bbcf03a7965b06c4bf04568167", size = 10502442, upload-time = "2026-01-22T22:30:38.93Z" },
     { url = "https://files.pythonhosted.org/packages/87/44/90fa543014c45560cae1fffc63ea059fb3575ee6e1cb654562197e5d16fb/ruff-0.14.14-py3-none-win_amd64.whl", hash = "sha256:3dde1435e6b6fe5b66506c1dff67a421d0b7f6488d466f651c07f4cab3bf20fd", size = 11630486, upload-time = "2026-01-22T22:30:10.852Z" },
     { url = "https://files.pythonhosted.org/packages/9e/6a/40fee331a52339926a92e17ae748827270b288a35ef4a15c9c8f2ec54715/ruff-0.14.14-py3-none-win_arm64.whl", hash = "sha256:56e6981a98b13a32236a72a8da421d7839221fa308b223b9283312312e5ac76c", size = 10920448, upload-time = "2026-01-22T22:30:15.417Z" },
+]
+
+[[package]]
+name = "sanitary"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/10/90aae1a55fea31a21ac0466f9ff4a351604977a3aa8438f68d67fc01f719/sanitary-0.1.0.tar.gz", hash = "sha256:b3cb8a9e368509a4c01addc5dd7f3f97c67735aa2ad14c90054ac6f63a1d23df", size = 14524, upload-time = "2025-05-18T11:01:27.934Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/42/ebd115d683281b2650f32a936a108fd8f018655665df115b9252523b8e2c/sanitary-0.1.0-py3-none-any.whl", hash = "sha256:bf892d679c6a79ee2c25c03597cda2046bb9edff9b692ee2e0670819cbe5836b", size = 6708, upload-time = "2025-05-18T11:01:26.589Z" },
 ]
 
 [[package]]

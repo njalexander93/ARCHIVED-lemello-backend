@@ -5,8 +5,10 @@ from typing import Any, Dict
 from fastapi import APIRouter, Response, status
 
 from app.core.config import settings
+from app.core.logger import get_logger
 
 router = APIRouter(tags=["health"])
+logger = get_logger(__name__)
 
 
 @router.get("/health")
@@ -33,7 +35,11 @@ async def health_check(response: Response) -> Dict[str, Any]:
             # TODO: Add actual database ping when database is set up
             # await database.execute("SELECT 1")
             health_status["checks"]["database"] = "not_implemented"
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "Database health check failed",
+                extra={"error": str(e)},
+            )
             health_status["checks"]["database"] = "error"
             health_status["status"] = "degraded"
 
@@ -43,12 +49,20 @@ async def health_check(response: Response) -> Dict[str, Any]:
             # TODO: Add actual Redis ping when Redis is set up
             # await redis.ping()
             health_status["checks"]["redis"] = "not_implemented"
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "Redis health check failed",
+                extra={"error": str(e)},
+            )
             health_status["checks"]["redis"] = "error"
             health_status["status"] = "degraded"
 
     # Set appropriate HTTP status code
     if health_status["status"] == "degraded":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        logger.warning(
+            "Health check degraded",
+            extra={"checks": health_status["checks"]},
+        )
 
     return health_status

@@ -9,6 +9,28 @@ The core service layer for Lemello — an AI-powered cooking platform that trans
 
 ---
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Related Repositories](#related-repositories)
+- [Requirements](#requirements)
+- [Technology Stack](#technology-stack)
+- [Code Style](#code-style)
+- [Deployment Target](#deployment-target)
+- [Installing Python 3.14](#installing-python-314)
+- [Installing uv](#installing-uv)
+- [Local Development Setup](#local-development-setup)
+- [Environment Setup](#environment-setup)
+- [Containerization](#containerization)
+- [App Platform Considerations](#app-platform-considerations)
+- [Dependency Management](#dependency-management)
+- [Database Configuration](#database-configuration)
+- [Releasing](#releasing)
+- [Security Notes](#security-notes)
+- [License](#license)
+
+---
+
 ## Overview
 
 The backend is responsible for:
@@ -295,6 +317,110 @@ Or use the Makefile:
 
 ```bash
 make dev
+```
+
+### Logging
+
+The backend uses structured logging with support for both human-readable TEXT format (development) and machine-parsable JSON format (production).
+
+#### Log Configuration
+
+Configure logging via environment variables:
+
+```bash
+LOG_LEVEL=INFO        # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_FORMAT=TEXT       # TEXT (colored, human-readable) or JSON (structured)
+```
+
+**Note:** When using TEXT format, logs are automatically saved to `backend/logs/` directory with timestamped filenames (e.g., `lemello_20260202_153045.log`) for easier debugging. This directory is git-ignored.
+
+#### Log Formats
+
+**TEXT Format (Development):**
+```
+2026-02-01 12:35:01,456 [INFO] [req_7f3a9c2b] Request started
+  request_method: GET
+  request_path: /api/recipes
+  client_host: 127.0.0.1
+```
+
+**JSON Format (Production):**
+```json
+{
+  "timestamp": "2026-02-01T12:35:01.456Z",
+  "level": "INFO",
+  "logger": "app.main",
+  "correlation_id": "req_7f3a9c2b",
+  "message": "Request started",
+  "request_method": "GET",
+  "request_path": "/api/recipes",
+  "client_host": "127.0.0.1"
+}
+```
+
+#### Correlation IDs
+
+Every request is assigned a correlation ID for end-to-end tracing:
+
+- Frontend sends `X-Correlation-ID` header (if available)
+- Backend generates UUID if header is missing
+- ID is included in all log entries for that request
+- Backend echoes ID in response headers
+
+**Tracing a request across logs:**
+```bash
+# Find all logs for a specific request
+grep "req_7f3a9c2b" logs.txt
+
+# Or with JSON logs
+jq 'select(.correlation_id == "req_7f3a9c2b")' logs.json
+```
+
+#### Using the Logger
+
+```python
+from app.core.logger import get_logger
+
+logger = get_logger(__name__)
+
+# Basic logging
+logger.info("Processing recipe")
+
+# Structured logging with extra fields
+logger.info(
+    "Recipe created",
+    extra={
+        "recipe_id": recipe.id,
+        "user_id": user.id,
+        "duration_ms": 142,
+    }
+)
+
+# Error logging
+try:
+    process_recipe(recipe)
+except Exception as e:
+    logger.error(
+        "Recipe processing failed",
+        extra={"recipe_id": recipe.id, "error": str(e)},
+        exc_info=True,  # Includes stack trace
+    )
+```
+
+#### Sensitive Data Protection
+
+The logger automatically redacts sensitive fields:
+- `password`, `token`, `secret`, `authorization`
+- `api_key`, `bearer`, `access_token`, `jwt`
+
+```python
+logger.info(
+    "User login",
+    extra={
+        "username": "test@example.com",
+        "password": "secret123",  # Automatically becomes "***REDACTED***"
+    }
+)
 ```
 
 ---
