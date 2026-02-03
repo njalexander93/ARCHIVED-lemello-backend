@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.logger import get_logger
 
 router = APIRouter(tags=["health"])
-logger = get_logger(__name__)
+log = get_logger(__name__)
 
 
 @router.get("/health")
@@ -36,7 +36,7 @@ async def health_check(response: Response) -> Dict[str, Any]:
             # await database.execute("SELECT 1")
             health_status["checks"]["database"] = "not_implemented"
         except Exception:
-            logger.exception("Database health check failed")
+            log.exception("Database health check failed")
             health_status["checks"]["database"] = "error"
             health_status["status"] = "degraded"
 
@@ -47,14 +47,14 @@ async def health_check(response: Response) -> Dict[str, Any]:
             # await redis.ping()
             health_status["checks"]["redis"] = "not_implemented"
         except Exception:
-            logger.exception("Redis health check failed")
+            log.exception("Redis health check failed")
             health_status["checks"]["redis"] = "error"
             health_status["status"] = "degraded"
 
     # Set appropriate HTTP status code
     if health_status["status"] == "degraded":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        logger.warning(
+        log.warning(
             "Health check degraded",
             extra={"checks": health_status["checks"]},
         )

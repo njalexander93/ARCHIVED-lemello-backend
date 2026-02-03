@@ -8,18 +8,17 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.core.config import Environment, settings
 from app.core.logger import configure_logging, correlation_id_var, get_logger
 from app.routers import health
 
-# Configure logging before application startup
-configure_logging()
-logger = get_logger(__name__)
+log = get_logger(__name__)
 
 # Create FastAPI application instance
 app = FastAPI(
@@ -92,7 +91,8 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event() -> None:
     """Log application startup with configuration details."""
-    logger.info(
+    configure_logging()
+    log.info(
         "Application starting",
         extra={
             "version": __version__,
@@ -107,7 +107,7 @@ async def startup_event() -> None:
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
     """Log application shutdown."""
-    logger.info("Application shutting down")
+    log.info("Application shutting down")
 
 
 # Correlation ID and request logging middleware
@@ -138,9 +138,10 @@ async def correlation_id_middleware(
     # Store in context for this request
     token = correlation_id_var.set(correlation_id)
 
+    start_time = time.perf_counter()
     try:
         # Log request start
-        logger.info(
+        log.info(
             "Request started",
             extra={
                 "request_method": request.method,
@@ -156,7 +157,6 @@ async def correlation_id_middleware(
         )
 
         # Process request and measure duration
-        start_time = time.perf_counter()
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start_time) * 1000
 
@@ -165,7 +165,7 @@ async def correlation_id_middleware(
 
         # Log request completion
         log_level = "warning" if response.status_code >= 400 else "info"
-        getattr(logger, log_level)(
+        getattr(log, log_level)(
             "Request completed",
             extra={
                 "request_method": request.method,
@@ -175,6 +175,40 @@ async def correlation_id_middleware(
             },
         )
 
+        return response
+    except HTTPException as exc:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        response = JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+        response.headers["X-Correlation-ID"] = correlation_id
+        log.warning(
+            "Request failed",
+            extra={
+                "request_method": request.method,
+                "request_path": str(request.url.path),
+                "response_status": exc.status_code,
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
+        return response
+    except Exception:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error"},
+        )
+        response.headers["X-Correlation-ID"] = correlation_id
+        log.exception(
+            "Request failed",
+            extra={
+                "request_method": request.method,
+                "request_path": str(request.url.path),
+                "response_status": 500,
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
         return response
     finally:
         correlation_id_var.reset(token)

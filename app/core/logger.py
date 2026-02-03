@@ -8,9 +8,12 @@ filtering.
 
 import json
 import logging
+import os
+import queue
 import sys
 from contextvars import ContextVar
 from datetime import datetime, timezone
+from logging.handlers import QueueHandler, QueueListener
 from pathlib import Path
 from typing import Optional
 
@@ -69,6 +72,9 @@ EXCLUDED_LOG_RECORD_ATTRS = {
     "stack_info",
     "taskName",
 }
+
+_file_log_listener: Optional[QueueListener] = None
+_managed_handlers: list[logging.Handler] = []
 
 
 class JSONFormatter(logging.Formatter):
@@ -229,25 +235,37 @@ def configure_logging() -> None:
 
     Sets up the root logger with appropriate formatter (JSON or TEXT)
     and log level based on configuration. For TEXT format, also creates
-    a file handler that saves logs to backend/logs/ directory with
-    timestamped filenames for easier debugging.
+    a file handler that saves logs to the backend repo's logs/ directory
+    with timestamped filenames for easier debugging.
 
     Should be called once during application startup.
     """
+    global _file_log_listener, _managed_handlers
+
     # Get root logger
     root_logger = logging.getLogger()
 
-    # Remove existing handlers
-    for handler in root_logger.handlers[:]:
+    # Stop previous file listener if present
+    if _file_log_listener is not None:
+        try:
+            _file_log_listener.stop()
+        finally:
+            _file_log_listener = None
+
+    # Remove handlers previously added by this module
+    for handler in _managed_handlers:
         try:
             handler.flush()
         except Exception:
+            # Best-effort cleanup: ignore errors when flushing handlers
             pass
         try:
             handler.close()
         except Exception:
+            # Best-effort cleanup: ignore errors when closing handlers
             pass
         root_logger.removeHandler(handler)
+    _managed_handlers = []
 
     # Set log level
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -271,6 +289,7 @@ def configure_logging() -> None:
 
     # Add handler to root logger
     root_logger.addHandler(console_handler)
+    _managed_handlers.append(console_handler)
 
     # For TEXT format, also log to file for easier debugging
     if settings.log_format.upper() == "TEXT":
@@ -280,8 +299,8 @@ def configure_logging() -> None:
             logs_dir.mkdir(parents=True, exist_ok=True)
 
             # Create timestamped log filename
-            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-            log_filename = logs_dir / f"lemello_{timestamp}.log"
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+            log_filename = logs_dir / f"lemello_{timestamp}_{os.getpid()}.log"
 
             # Create file handler with plain text (no colors)
             file_handler = logging.FileHandler(log_filename, encoding="utf-8")
@@ -289,8 +308,23 @@ def configure_logging() -> None:
             file_handler.setFormatter(TextFormatter(use_colors=False))
             file_handler.addFilter(CorrelationIDFilter())
 
-            # Add file handler to root logger
-            root_logger.addHandler(file_handler)
+            # Use a queue to avoid blocking the event loop on file I/O
+            log_queue: queue.Queue[logging.LogRecord] = queue.Queue(-1)
+            queue_handler = QueueHandler(log_queue)
+            queue_handler.setLevel(log_level)
+            queue_handler.addFilter(CorrelationIDFilter())
+
+            # Start listener thread to write logs to file
+            _file_log_listener = QueueListener(
+                log_queue,
+                file_handler,
+                respect_handler_level=True,
+            )
+            _file_log_listener.start()
+
+            # Add queue handler to root logger
+            root_logger.addHandler(queue_handler)
+            _managed_handlers.append(queue_handler)
 
             # Log the file location for user reference
             root_logger.info("Logging to file: %s", log_filename)
