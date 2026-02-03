@@ -16,6 +16,7 @@ from fastapi.exception_handlers import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.core.config import Environment, settings
@@ -151,6 +152,28 @@ async def validation_exception_with_correlation(
     """Attach correlation ID to validation error responses."""
     response = await request_validation_exception_handler(request, exc)
     correlation_id = getattr(request.state, "correlation_id", None)
+    if correlation_id:
+        response.headers["X-Correlation-ID"] = correlation_id
+    return apply_security_headers(response)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_with_correlation(
+    request: Request, exc: Exception
+) -> Response:
+    """Attach correlation ID and security headers to 500 responses."""
+    correlation_id = getattr(request.state, "correlation_id", None)
+    log.exception(
+        "Unhandled exception",
+        extra={
+            "request_method": request.method,
+            "request_path": str(request.url.path),
+        },
+    )
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
     if correlation_id:
         response.headers["X-Correlation-ID"] = correlation_id
     return apply_security_headers(response)

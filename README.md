@@ -335,7 +335,7 @@ LOG_FILE_ENABLED=false  # Enable file logging for TEXT format
 ```
 
 **Note:** File logging is optional. When `LOG_FILE_ENABLED=true` and
-`LOG_FORMAT=TEXT`, logs are saved to `backend/logs/` with timestamped filenames
+`LOG_FORMAT=TEXT`, logs are saved to `logs/` with timestamped filenames
 (e.g., `lemello_20260202_153045.log`) for easier debugging. This directory is
 git-ignored.
 

@@ -140,6 +140,35 @@ class TestRequestLogging:
             assert found_error_log
 
 
+class TestUnhandledExceptions:
+    """Test unhandled exception responses."""
+
+    def test_unhandled_exception_adds_headers(self) -> None:
+        """Ensure 500 responses include correlation and security headers."""
+        from app.main import app
+
+        async def boom() -> None:
+            raise Exception("boom")
+
+        original_routes = list(app.router.routes)
+        app.add_api_route("/boom-test", boom, methods=["GET"])
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.get(
+                    "/boom-test",
+                    headers={"X-Correlation-ID": "test-err-123"},
+                )
+
+            assert response.status_code == 500
+            assert response.json() == {"detail": "Internal Server Error"}
+            assert response.headers["X-Correlation-ID"] == "test-err-123"
+            assert response.headers["X-Content-Type-Options"] == "nosniff"
+            assert response.headers["X-Frame-Options"] == "DENY"
+            assert response.headers["X-XSS-Protection"] == "1; mode=block"
+        finally:
+            app.router.routes = original_routes
+
+
 class TestLifecycleLogging:
     """Test application lifecycle event logging."""
 

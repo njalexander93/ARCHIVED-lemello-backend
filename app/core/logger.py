@@ -343,6 +343,9 @@ def configure_logging() -> None:
 
     # For TEXT format, optionally log to file for easier debugging
     if settings.log_format.upper() == "TEXT" and settings.log_file_enabled:
+        file_handler: Optional[logging.Handler] = None
+        queue_handler: Optional[logging.Handler] = None
+        listener: Optional[QueueListener] = None
         try:
             # Create logs directory if it doesn't exist
             logs_dir = Path(__file__).resolve().parents[2] / "logs"
@@ -368,12 +371,13 @@ def configure_logging() -> None:
             queue_handler.addFilter(CorrelationIDFilter())
 
             # Start listener thread to write logs to file
-            _file_log_listener = QueueListener(
+            listener = QueueListener(
                 log_queue,
                 file_handler,
                 respect_handler_level=True,
             )
-            _file_log_listener.start()
+            listener.start()
+            _file_log_listener = listener
 
             # Add queue handler to root logger
             root_logger.addHandler(queue_handler)
@@ -386,6 +390,23 @@ def configure_logging() -> None:
                 "File logging disabled: %s",
                 exc,
             )
+            if listener is not None:
+                try:
+                    listener.stop()
+                except Exception:
+                    # Best-effort cleanup: ignore listener stop errors
+                    pass
+            if queue_handler is not None and queue_handler in _managed_handlers:
+                root_logger.removeHandler(queue_handler)
+                _managed_handlers.remove(queue_handler)
+            if file_handler is not None:
+                try:
+                    file_handler.close()
+                except Exception:
+                    # Best-effort cleanup: ignore close errors on setup failure
+                    pass
+            _file_log_listener = None
+            _file_handler = None
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:
