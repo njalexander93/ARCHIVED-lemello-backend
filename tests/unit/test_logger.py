@@ -339,8 +339,10 @@ class TestFileLogging:
             logger_module.configure_logging()
             logger_module.shutdown_logging()
 
-            logs_dir = Path(tmp_path / "app" / "logs")
+            logs_dir = Path(tmp_path / "logs")
+            # No logs directory or lemello_* log files should be created
             assert not logs_dir.exists()
+            assert not list(logs_dir.glob("lemello_*.log"))
         finally:
             settings.log_format = original_format
             settings.log_file_enabled = original_enabled
