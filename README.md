@@ -375,10 +375,10 @@ Every request is assigned a correlation ID for end-to-end tracing:
 **Tracing a request across logs:**
 ```bash
 # Find all logs for a specific request
-grep "req_7f3a9c2b" logs.txt
+grep "123e4567-e89b-12d3-a456-426614174000" logs.txt
 
 # Or with JSON logs
-jq 'select(.correlation_id == "req_7f3a9c2b")' logs.json
+jq 'select(.correlation_id == "123e4567-e89b-12d3-a456-426614174000")' logs.json
 ```
 
 #### Using the Logger
