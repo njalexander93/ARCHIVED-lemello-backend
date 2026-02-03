@@ -73,10 +73,8 @@ class TestRequestLogging:
 
             # Check for request-related log messages
             log_messages = [record.getMessage() for record in caplog.records]
-            assert any(
-                "Request started" in msg or "Request completed" in msg
-                for msg in log_messages
-            )
+            assert any("Request started" in msg for msg in log_messages)
+            assert any("Request completed" in msg for msg in log_messages)
 
     def test_logs_request_method_and_path(
         self, test_client: TestClient, caplog
@@ -144,32 +142,28 @@ class TestRequestLogging:
 class TestLifecycleLogging:
     """Test application lifecycle event logging."""
 
-    def test_startup_logs_application_info(
-        self, test_client: TestClient, caplog
-    ):
+    def test_startup_logs_application_info(self, caplog):
         """Test that startup event logs application information."""
         from app import __version__
+        from app.main import app
 
-        # Startup events happen when app is created, so we use caplog to capture
+        # Startup events happen when TestClient is created
         with caplog.at_level(logging.INFO):
-            # Touch the client to trigger startup if not already
-            test_client.get("/health")
+            with TestClient(app) as client:
+                client.get("/health")
 
-            # Check for startup-related logs
-            log_messages = [record.getMessage() for record in caplog.records]
-            log_text = " ".join(log_messages).lower()
+        # Check for startup-related logs
+        log_messages = [record.getMessage() for record in caplog.records]
+        log_text = " ".join(log_messages).lower()
 
-            # Check if startup was logged or if version info is present
-            startup_logged = (
-                "starting" in log_text
-                or "startup" in log_text
-                or any(__version__ in msg for msg in log_messages)
-            )
+        # Check if startup was logged or if version info is present
+        startup_logged = (
+            "starting" in log_text
+            or "startup" in log_text
+            or any(__version__ in msg for msg in log_messages)
+        )
 
-            # Note: startup event might have already been triggered
-            # by previous tests, so we check for either startup or just
-            # that the client was created successfully
-            assert startup_logged or test_client is not None
+        assert startup_logged
 
     def test_shutdown_logs_message(self, caplog):
         """Test that shutdown event logs a message."""

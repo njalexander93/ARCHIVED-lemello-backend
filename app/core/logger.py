@@ -111,7 +111,10 @@ class JSONFormatter(logging.Formatter):
         }
 
         if extra_fields:
-            log_dict.update(sanitizer.sanitize(extra_fields))
+            sanitized = sanitizer.sanitize(extra_fields)
+            for key, value in sanitized.items():
+                if key not in log_dict:
+                    log_dict[key] = value
 
         # Add exception info if present
         if record.exc_info:
@@ -189,7 +192,8 @@ class TextFormatter(logging.Formatter):
         if extra_fields:
             sanitized = sanitizer.sanitize(extra_fields)
             for key, value in sanitized.items():
-                log_line += f"\n  {key}: {value}"
+                if key not in {"timestamp", "level", "logger", "message"}:
+                    log_line += f"\n  {key}: {value}"
 
         # Add exception info if present
         if record.exc_info:
@@ -234,7 +238,16 @@ def configure_logging() -> None:
     root_logger = logging.getLogger()
 
     # Remove existing handlers
-    root_logger.handlers.clear()
+    for handler in root_logger.handlers[:]:
+        try:
+            handler.flush()
+        except Exception:
+            pass
+        try:
+            handler.close()
+        except Exception:
+            pass
+        root_logger.removeHandler(handler)
 
     # Set log level
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -261,25 +274,31 @@ def configure_logging() -> None:
 
     # For TEXT format, also log to file for easier debugging
     if settings.log_format.upper() == "TEXT":
-        # Create logs directory if it doesn't exist
-        logs_dir = Path(__file__).resolve().parents[2] / "logs"
-        logs_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            # Create logs directory if it doesn't exist
+            logs_dir = Path(__file__).resolve().parents[2] / "logs"
+            logs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create timestamped log filename
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        log_filename = logs_dir / f"lemello_{timestamp}.log"
+            # Create timestamped log filename
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            log_filename = logs_dir / f"lemello_{timestamp}.log"
 
-        # Create file handler with plain text (no colors)
-        file_handler = logging.FileHandler(log_filename, encoding="utf-8")
-        file_handler.setLevel(log_level)
-        file_handler.setFormatter(TextFormatter(use_colors=False))
-        file_handler.addFilter(CorrelationIDFilter())
+            # Create file handler with plain text (no colors)
+            file_handler = logging.FileHandler(log_filename, encoding="utf-8")
+            file_handler.setLevel(log_level)
+            file_handler.setFormatter(TextFormatter(use_colors=False))
+            file_handler.addFilter(CorrelationIDFilter())
 
-        # Add file handler to root logger
-        root_logger.addHandler(file_handler)
+            # Add file handler to root logger
+            root_logger.addHandler(file_handler)
 
-        # Log the file location for user reference
-        root_logger.info("Logging to file: %s", log_filename)
+            # Log the file location for user reference
+            root_logger.info("Logging to file: %s", log_filename)
+        except Exception as exc:
+            root_logger.warning(
+                "File logging disabled: %s",
+                exc,
+            )
 
 
 def get_logger(name: Optional[str] = None) -> logging.Logger:

@@ -258,42 +258,48 @@ class TestCorrelationIDFilter:
 
     def test_filter_adds_correlation_id(self):
         """Test that filter adds correlation ID from context."""
-        correlation_id_var.set("test_correlation_id")
+        token = correlation_id_var.set("test_correlation_id")
         filter_obj = CorrelationIDFilter()
 
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=10,
-            msg="Test",
-            args=(),
-            exc_info=None,
-        )
+        try:
+            record = logging.LogRecord(
+                name="test",
+                level=logging.INFO,
+                pathname="test.py",
+                lineno=10,
+                msg="Test",
+                args=(),
+                exc_info=None,
+            )
 
-        result = filter_obj.filter(record)
+            result = filter_obj.filter(record)
 
-        assert result is True
-        assert hasattr(record, "correlation_id")
-        assert record.correlation_id == "test_correlation_id"
+            assert result is True
+            assert hasattr(record, "correlation_id")
+            assert record.correlation_id == "test_correlation_id"
+        finally:
+            correlation_id_var.reset(token)
 
     def test_filter_without_correlation_id(self):
         """Test that filter handles missing correlation ID gracefully."""
-        correlation_id_var.set("")
+        token = correlation_id_var.set("")
         filter_obj = CorrelationIDFilter()
 
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="test.py",
-            lineno=10,
-            msg="Test",
-            args=(),
-            exc_info=None,
-        )
+        try:
+            record = logging.LogRecord(
+                name="test",
+                level=logging.INFO,
+                pathname="test.py",
+                lineno=10,
+                msg="Test",
+                args=(),
+                exc_info=None,
+            )
 
-        result = filter_obj.filter(record)
+            result = filter_obj.filter(record)
 
-        assert result is True
-        # Should not have correlation_id if context var is empty
-        assert not hasattr(record, "correlation_id")
+            assert result is True
+            # Should not have correlation_id if context var is empty
+            assert not hasattr(record, "correlation_id")
+        finally:
+            correlation_id_var.reset(token)
