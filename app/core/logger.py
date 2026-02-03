@@ -102,6 +102,9 @@ def shutdown_logging() -> None:
     if _file_log_listener is not None:
         try:
             _file_log_listener.stop()
+        except Exception:
+            # Best-effort cleanup: ignore listener stop errors
+            pass
         finally:
             _file_log_listener = None
 

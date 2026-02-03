@@ -188,10 +188,9 @@ class TestFileLoggingIntegration:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path: Path,
     ) -> None:
-        """Test that TEXT file logging writes to backend/logs."""
-        import app.core.logger as logger_module
+        """Test that TEXT file logging writes to the logs directory."""
+        from app.core import logger as logger_module
         from app.core.config import settings
-        from app.core.logger import shutdown_logging
         from app.main import app
 
         fake_file = tmp_path / "app" / "core" / "logger.py"
@@ -207,7 +206,7 @@ class TestFileLoggingIntegration:
             with TestClient(app) as client:
                 client.get("/health")
 
-            shutdown_logging()
+            logger_module.shutdown_logging()
             logs_dir = tmp_path / "logs"
             files = list(logs_dir.glob("lemello_*.log"))
             assert files
@@ -215,4 +214,4 @@ class TestFileLoggingIntegration:
         finally:
             settings.log_format = original_format
             settings.log_file_enabled = original_enabled
-            shutdown_logging()
+            logger_module.shutdown_logging()
