@@ -201,7 +201,6 @@ async def correlation_id_middleware(
             content={"detail": "Internal Server Error"},
         )
         response.headers["X-Correlation-ID"] = correlation_id
-        apply_security_headers(response)
         log.exception(
             "Request failed",
             extra={

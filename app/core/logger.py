@@ -91,6 +91,7 @@ class NonBlockingQueueHandler(QueueHandler):
             try:
                 sys.stderr.write("Log queue full; dropping log record.\n")
             except Exception:
+                # Best-effort cleanup: ignore stderr write errors
                 pass
 
 

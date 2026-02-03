@@ -2,6 +2,7 @@
 
 import json
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -278,6 +279,78 @@ class TestCorrelationIDFilter:
             assert record.correlation_id == "test_correlation_id"
         finally:
             correlation_id_var.reset(token)
+
+
+class TestFileLogging:
+    """Test file logging configuration."""
+
+    def test_file_logging_enabled_creates_file(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Test that file logging writes to backend/logs."""
+        import app.core.logger as logger_module
+        from app.core.config import settings
+        from app.core.logger import (
+            configure_logging,
+            get_logger,
+            shutdown_logging,
+        )
+
+        fake_file = tmp_path / "app" / "core" / "logger.py"
+        fake_file.parent.mkdir(parents=True, exist_ok=True)
+        fake_file.write_text("# stub")
+        monkeypatch.setattr(logger_module, "__file__", str(fake_file))
+
+        original_format = settings.log_format
+        original_enabled = settings.log_file_enabled
+        try:
+            settings.log_format = "TEXT"
+            settings.log_file_enabled = True
+            configure_logging()
+            log = get_logger("test.file")
+            log.info("file logging test")
+            shutdown_logging()
+
+            logs_dir = Path(tmp_path / "logs")
+            files = list(logs_dir.glob("lemello_*.log"))
+            assert files
+            assert "file logging test" in files[0].read_text()
+        finally:
+            settings.log_format = original_format
+            settings.log_file_enabled = original_enabled
+            shutdown_logging()
+
+    def test_file_logging_disabled_skips_file(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Test that file logging is skipped when disabled."""
+        import app.core.logger as logger_module
+        from app.core.config import settings
+        from app.core.logger import configure_logging, shutdown_logging
+
+        fake_file = tmp_path / "app" / "core" / "logger.py"
+        fake_file.parent.mkdir(parents=True, exist_ok=True)
+        fake_file.write_text("# stub")
+        monkeypatch.setattr(logger_module, "__file__", str(fake_file))
+
+        original_format = settings.log_format
+        original_enabled = settings.log_file_enabled
+        try:
+            settings.log_format = "TEXT"
+            settings.log_file_enabled = False
+            configure_logging()
+            shutdown_logging()
+
+            logs_dir = Path(tmp_path / "app" / "logs")
+            assert not logs_dir.exists()
+        finally:
+            settings.log_format = original_format
+            settings.log_file_enabled = original_enabled
+            shutdown_logging()
 
     def test_filter_without_correlation_id(self):
         """Test that filter handles missing correlation ID gracefully."""

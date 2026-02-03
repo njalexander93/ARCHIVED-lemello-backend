@@ -1,6 +1,7 @@
 """Integration tests for logging middleware and correlation IDs."""
 
 import logging
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -177,3 +178,41 @@ class TestLifecycleLogging:
         assert any(
             "shutting down" in message.lower() for message in log_messages
         )
+
+
+class TestFileLoggingIntegration:
+    """Integration tests for optional file logging."""
+
+    def test_file_logging_enabled_creates_file(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        """Test that TEXT file logging writes to backend/logs."""
+        import app.core.logger as logger_module
+        from app.core.config import settings
+        from app.core.logger import shutdown_logging
+        from app.main import app
+
+        fake_file = tmp_path / "app" / "core" / "logger.py"
+        fake_file.parent.mkdir(parents=True, exist_ok=True)
+        fake_file.write_text("# stub")
+        monkeypatch.setattr(logger_module, "__file__", str(fake_file))
+
+        original_format = settings.log_format
+        original_enabled = settings.log_file_enabled
+        try:
+            settings.log_format = "TEXT"
+            settings.log_file_enabled = True
+            with TestClient(app) as client:
+                client.get("/health")
+
+            shutdown_logging()
+            logs_dir = tmp_path / "logs"
+            files = list(logs_dir.glob("lemello_*.log"))
+            assert files
+            assert any("Request started" in f.read_text() for f in files)
+        finally:
+            settings.log_format = original_format
+            settings.log_file_enabled = original_enabled
+            shutdown_logging()
