@@ -3,15 +3,32 @@
 Main application factory with CORS middleware and router registration.
 """
 
+import re
+import time
+import uuid
 from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.exception_handlers import (
+    http_exception_handler,
+    request_validation_exception_handler,
+)
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.core.config import Environment, settings
+from app.core.logger import (
+    configure_logging,
+    correlation_id_var,
+    get_logger,
+    shutdown_logging,
+)
 from app.routers import health
+
+log = get_logger(__name__)
 
 # Create FastAPI application instance
 app = FastAPI(
@@ -75,8 +92,163 @@ app.add_middleware(
     allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Correlation-ID"],
+    expose_headers=["X-Correlation-ID"],
 )
+
+
+# Application lifecycle events
+@app.on_event("startup")
+async def startup_event() -> None:
+    """Log application startup with configuration details."""
+    configure_logging()
+    log.info(
+        "Application starting",
+        extra={
+            "version": __version__,
+            "environment": settings.app_env.value,
+            "log_level": settings.log_level,
+            "log_format": settings.log_format,
+            "debug_mode": settings.app_debug,
+        },
+    )
+
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    """Log application shutdown."""
+    log.info("Application shutting down")
+    shutdown_logging()
+
+
+def apply_security_headers(response: Response) -> Response:
+    """Add security headers to a response."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    if settings.app_env == Environment.PRODUCTION:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_with_correlation(
+    request: Request, exc: HTTPException
+) -> Response:
+    """Attach correlation ID to HTTP error responses."""
+    response = await http_exception_handler(request, exc)
+    correlation_id = getattr(request.state, "correlation_id", None)
+    if correlation_id:
+        response.headers["X-Correlation-ID"] = correlation_id
+    return apply_security_headers(response)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_with_correlation(
+    request: Request, exc: RequestValidationError
+) -> Response:
+    """Attach correlation ID to validation error responses."""
+    response = await request_validation_exception_handler(request, exc)
+    correlation_id = getattr(request.state, "correlation_id", None)
+    if correlation_id:
+        response.headers["X-Correlation-ID"] = correlation_id
+    return apply_security_headers(response)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_with_correlation(
+    request: Request, exc: Exception
+) -> Response:
+    """Attach correlation ID and security headers to 500 responses."""
+    correlation_id = getattr(request.state, "correlation_id", None)
+    log.exception(
+        "Unhandled exception",
+        extra={
+            "request_method": request.method,
+            "request_path": str(request.url.path),
+        },
+    )
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal Server Error"},
+    )
+    if correlation_id:
+        response.headers["X-Correlation-ID"] = correlation_id
+    return apply_security_headers(response)
+
+
+# Correlation ID and request logging middleware
+@app.middleware("http")
+async def correlation_id_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Add correlation ID to request context and log request/response.
+
+    Extracts or generates a correlation ID for request tracing, stores it in
+    context, and logs request start/completion with timing information.
+
+    Args:
+        request: The incoming HTTP request.
+        call_next: The next middleware or route handler.
+
+    Returns:
+        Response with X-Correlation-ID header added.
+    """
+    raw_correlation_id = request.headers.get("X-Correlation-ID")
+    correlation_id = None
+    if raw_correlation_id:
+        candidate = raw_correlation_id.strip()
+        if len(candidate) <= 64 and re.fullmatch(r"[A-Za-z0-9._-]+", candidate):
+            correlation_id = candidate
+    if correlation_id is None:
+        correlation_id = str(uuid.uuid4())
+
+    # Store in context for this request
+    token = correlation_id_var.set(correlation_id)
+    request.state.correlation_id = correlation_id
+
+    start_time = time.perf_counter()
+    try:
+        # Log request start
+        log.info(
+            "Request started",
+            extra={
+                "request_method": request.method,
+                "request_path": str(request.url.path),
+                "request_query_keys": (
+                    list(request.query_params.keys())
+                    if request.query_params
+                    else None
+                ),
+                "client_host": request.client.host if request.client else None,
+                "user_agent": request.headers.get("user-agent"),
+            },
+        )
+
+        # Process request and measure duration
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start_time) * 1000
+
+        # Add correlation ID to response headers
+        response.headers["X-Correlation-ID"] = correlation_id
+
+        # Log request completion
+        log_level = "warning" if response.status_code >= 400 else "info"
+        getattr(log, log_level)(
+            "Request completed",
+            extra={
+                "request_method": request.method,
+                "request_path": str(request.url.path),
+                "response_status": response.status_code,
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
+
+        return response
+    finally:
+        correlation_id_var.reset(token)
 
 
 # Security headers middleware
@@ -94,23 +266,7 @@ async def add_security_headers(
         Response with added security headers.
     """
     response = await call_next(request)
-
-    # Prevent MIME type sniffing
-    response.headers["X-Content-Type-Options"] = "nosniff"
-
-    # Prevent clickjacking
-    response.headers["X-Frame-Options"] = "DENY"
-
-    # XSS protection (legacy, but still useful for older browsers)
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-
-    # HSTS (only in production)
-    if settings.app_env == Environment.PRODUCTION:
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains"
-        )
-
-    return response
+    return apply_security_headers(response)
 
 
 # Register routers

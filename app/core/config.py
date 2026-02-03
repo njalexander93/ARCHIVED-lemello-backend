@@ -109,11 +109,53 @@ class Settings(BaseSettings):
     # Logging & Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     log_format: str = Field(default="TEXT", alias="LOG_FORMAT")
+    log_file_enabled: bool = Field(default=False, alias="LOG_FILE_ENABLED")
     sentry_dsn: Optional[str] = Field(default=None, alias="SENTRY_DSN")
     otel_endpoint: Optional[str] = Field(default=None, alias="OTEL_ENDPOINT")
     otel_service_name: str = Field(
         default="lemello-backend", alias="OTEL_SERVICE_NAME"
     )
+
+    @field_validator("log_level")
+    @classmethod
+    def validate_log_level(cls, v: str) -> str:
+        """Validate log level is a recognized Python logging level.
+
+        Args:
+            v: The log level string to validate.
+
+        Returns:
+            The uppercase log level string.
+
+        Raises:
+            ValueError: If the log level is not valid.
+        """
+        valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        v_upper = v.upper()
+        if v_upper not in valid_levels:
+            raise ValueError(
+                f"LOG_LEVEL must be one of {valid_levels}, got '{v}'"
+            )
+        return v_upper
+
+    @field_validator("log_format")
+    @classmethod
+    def validate_log_format(cls, v: str) -> str:
+        """Validate log format is either JSON or TEXT.
+
+        Args:
+            v: The log format string to validate.
+
+        Returns:
+            The uppercase log format string.
+
+        Raises:
+            ValueError: If the log format is not valid.
+        """
+        v_upper = v.upper()
+        if v_upper not in ["JSON", "TEXT"]:
+            raise ValueError(f"LOG_FORMAT must be 'JSON' or 'TEXT', got '{v}'")
+        return v_upper
 
     @field_validator("secret_key")
     @classmethod
