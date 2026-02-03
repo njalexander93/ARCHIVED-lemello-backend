@@ -109,6 +109,7 @@ class Settings(BaseSettings):
     # Logging & Observability
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     log_format: str = Field(default="TEXT", alias="LOG_FORMAT")
+    log_file_enabled: bool = Field(default=False, alias="LOG_FILE_ENABLED")
     sentry_dsn: Optional[str] = Field(default=None, alias="SENTRY_DSN")
     otel_endpoint: Optional[str] = Field(default=None, alias="OTEL_ENDPOINT")
     otel_service_name: str = Field(

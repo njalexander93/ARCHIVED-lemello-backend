@@ -8,8 +8,7 @@ import time
 import uuid
 from collections.abc import Awaitable, Callable
 
-from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.exception_handlers import http_exception_handler
+from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -194,21 +193,6 @@ async def correlation_id_middleware(
             },
         )
 
-        return response
-    except HTTPException as exc:
-        duration_ms = (time.perf_counter() - start_time) * 1000
-        response = await http_exception_handler(request, exc)
-        response.headers["X-Correlation-ID"] = correlation_id
-        apply_security_headers(response)
-        log.warning(
-            "Request failed",
-            extra={
-                "request_method": request.method,
-                "request_path": str(request.url.path),
-                "response_status": exc.status_code,
-                "duration_ms": round(duration_ms, 2),
-            },
-        )
         return response
     except Exception:
         duration_ms = (time.perf_counter() - start_time) * 1000

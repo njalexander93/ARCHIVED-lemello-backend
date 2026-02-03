@@ -331,11 +331,13 @@ Configure logging via environment variables:
 ```bash
 LOG_LEVEL=INFO        # DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FORMAT=TEXT       # TEXT (colored, human-readable) or JSON (structured)
+LOG_FILE_ENABLED=false  # Enable file logging for TEXT format
 ```
 
-**Note:** When using TEXT format, logs are automatically saved to `backend/logs/`
-directory with timestamped filenames (e.g., `lemello_20260202_153045.log`) for
-easier debugging. This directory is git-ignored.
+**Note:** File logging is optional. When `LOG_FILE_ENABLED=true` and
+`LOG_FORMAT=TEXT`, logs are saved to `backend/logs/` with timestamped filenames
+(e.g., `lemello_20260202_153045.log`) for easier debugging. This directory is
+git-ignored.
 
 #### Log Formats
 

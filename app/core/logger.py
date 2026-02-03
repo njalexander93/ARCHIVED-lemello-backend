@@ -78,6 +78,22 @@ _managed_handlers: list[logging.Handler] = []
 _file_handler: Optional[logging.Handler] = None
 
 
+class NonBlockingQueueHandler(QueueHandler):
+    """QueueHandler that drops records when the queue is full."""
+
+    def enqueue(self, record: logging.LogRecord) -> None:
+        """Attempt to enqueue without blocking; drop if full."""
+        try:
+            self.queue.put_nowait(record)
+        except queue.Full:
+            # Best-effort logging: drop if the queue is saturated.
+            # Avoid recursive logging in a handler; write to stderr instead.
+            try:
+                sys.stderr.write("Log queue full; dropping log record.\n")
+            except Exception:
+                pass
+
+
 def shutdown_logging() -> None:
     """Stop background log listeners and close managed handlers."""
     global _file_log_listener, _managed_handlers, _file_handler
@@ -93,10 +109,12 @@ def shutdown_logging() -> None:
         try:
             _file_handler.flush()
         except Exception:
+            # Best-effort cleanup: ignore flush errors on shutdown
             pass
         try:
             _file_handler.close()
         except Exception:
+            # Best-effort cleanup: ignore close errors on shutdown
             pass
         _file_handler = None
 
@@ -106,10 +124,12 @@ def shutdown_logging() -> None:
         try:
             handler.flush()
         except Exception:
+            # Best-effort cleanup: ignore flush errors on shutdown
             pass
         try:
             handler.close()
         except Exception:
+            # Best-effort cleanup: ignore close errors on shutdown
             pass
         root_logger.removeHandler(handler)
     _managed_handlers = []
@@ -272,9 +292,9 @@ def configure_logging() -> None:
     """Configure application-wide logging based on settings.
 
     Sets up the root logger with appropriate formatter (JSON or TEXT)
-    and log level based on configuration. For TEXT format, also creates
-    a file handler that saves logs to the backend repo's logs/ directory
-    with timestamped filenames for easier debugging.
+    and log level based on configuration. For TEXT format, optionally
+    creates a file handler that saves logs to the backend repo's logs/
+    directory with timestamped filenames for easier debugging.
 
     Should be called once during application startup.
     """
@@ -317,8 +337,8 @@ def configure_logging() -> None:
     root_logger.addHandler(console_handler)
     _managed_handlers.append(console_handler)
 
-    # For TEXT format, also log to file for easier debugging
-    if settings.log_format.upper() == "TEXT":
+    # For TEXT format, optionally log to file for easier debugging
+    if settings.log_format.upper() == "TEXT" and settings.log_file_enabled:
         try:
             # Create logs directory if it doesn't exist
             logs_dir = Path(__file__).resolve().parents[2] / "logs"
@@ -335,9 +355,11 @@ def configure_logging() -> None:
             file_handler.addFilter(CorrelationIDFilter())
             _file_handler = file_handler
 
-            # Use a queue to avoid blocking the event loop on file I/O
-            log_queue: queue.Queue[logging.LogRecord] = queue.Queue(-1)
-            queue_handler = QueueHandler(log_queue)
+            # Use a bounded queue to avoid blocking the event loop on file I/O
+            log_queue: queue.Queue[logging.LogRecord] = queue.Queue(
+                maxsize=1000
+            )
+            queue_handler = NonBlockingQueueHandler(log_queue)
             queue_handler.setLevel(log_level)
             queue_handler.addFilter(CorrelationIDFilter())
 
