@@ -203,6 +203,8 @@ class JSONFormatter(logging.Formatter):
         # Add exception info if present
         if record.exc_info:
             log_dict["exc_info"] = self.formatException(record.exc_info)
+        elif record.exc_text:
+            log_dict["exc_info"] = record.exc_text
 
         return json.dumps(log_dict, default=str)
 
@@ -282,6 +284,8 @@ class TextFormatter(logging.Formatter):
         # Add exception info if present
         if record.exc_info:
             log_line += "\n" + self.formatException(record.exc_info)
+        elif record.exc_text:
+            log_line += "\n" + record.exc_text
 
         return log_line
 
