@@ -11,6 +11,7 @@ import logging
 import os
 import queue
 import sys
+import time
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from logging.handlers import QueueHandler, QueueListener
@@ -81,18 +82,33 @@ _file_handler: Optional[logging.Handler] = None
 class NonBlockingQueueHandler(QueueHandler):
     """QueueHandler that drops records when the queue is full."""
 
+    def __init__(self, queue: queue.Queue[logging.LogRecord]) -> None:
+        """Initialize handler with rate-limited stderr warnings."""
+        super().__init__(queue)
+        self._dropped_count = 0
+        self._last_warning_time = 0.0
+
     def enqueue(self, record: logging.LogRecord) -> None:
         """Attempt to enqueue without blocking; drop if full."""
         try:
             self.queue.put_nowait(record)
         except queue.Full:
+            self._dropped_count += 1
+            now = time.monotonic()
+            if now - self._last_warning_time < 5.0:
+                return
             # Best-effort logging: drop if the queue is saturated.
             # Avoid recursive logging in a handler; write to stderr instead.
             try:
-                sys.stderr.write("Log queue full; dropping log record.\n")
+                sys.stderr.write(
+                    "Log queue full; dropped %d records.\n"
+                    % self._dropped_count
+                )
             except Exception:
                 # Best-effort cleanup: ignore stderr write errors
                 pass
+            self._dropped_count = 0
+            self._last_warning_time = now
 
 
 def shutdown_logging() -> None:

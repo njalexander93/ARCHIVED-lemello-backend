@@ -196,13 +196,14 @@ async def correlation_id_middleware(
     Returns:
         Response with X-Correlation-ID header added.
     """
-    # Extract or generate correlation ID
-    correlation_id = str(uuid.uuid4())
     raw_correlation_id = request.headers.get("X-Correlation-ID")
+    correlation_id = None
     if raw_correlation_id:
         candidate = raw_correlation_id.strip()
         if len(candidate) <= 64 and re.fullmatch(r"[A-Za-z0-9._-]+", candidate):
             correlation_id = candidate
+    if correlation_id is None:
+        correlation_id = str(uuid.uuid4())
 
     # Store in context for this request
     token = correlation_id_var.set(correlation_id)
