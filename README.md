@@ -21,6 +21,7 @@ The core service layer for Lemello — an AI-powered cooking platform that trans
 - [Installing uv](#installing-uv)
 - [Local Development Setup](#local-development-setup)
 - [Environment Setup](#environment-setup)
+- [Logging](#logging)
 - [Containerization](#containerization)
 - [App Platform Considerations](#app-platform-considerations)
 - [Dependency Management](#dependency-management)
@@ -340,7 +341,7 @@ easier debugging. This directory is git-ignored.
 
 **TEXT Format (Development):**
 ```
-2026-02-01 12:35:01,456 [INFO] [req_7f3a9c2b] Request started
+2026-02-01 12:35:01,456 [INFO] [98626c44-6892-4f5b-b184-22033b11a716] Request started
   request_method: GET
   request_path: /api/recipes
   client_host: 127.0.0.1
@@ -349,7 +350,7 @@ easier debugging. This directory is git-ignored.
 **JSON Format (Production):**
 ```json
 {
-  "timestamp": "2026-02-01T12:35:01.456Z",
+  "timestamp": "2026-02-01T12:35:01.456789+00:00",
   "level": "INFO",
   "logger": "app.main",
   "correlation_id": "req_7f3a9c2b",

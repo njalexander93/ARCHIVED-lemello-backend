@@ -75,6 +75,44 @@ EXCLUDED_LOG_RECORD_ATTRS = {
 
 _file_log_listener: Optional[QueueListener] = None
 _managed_handlers: list[logging.Handler] = []
+_file_handler: Optional[logging.Handler] = None
+
+
+def shutdown_logging() -> None:
+    """Stop background log listeners and close managed handlers."""
+    global _file_log_listener, _managed_handlers, _file_handler
+
+    if _file_log_listener is not None:
+        try:
+            _file_log_listener.stop()
+        finally:
+            _file_log_listener = None
+
+    # Close file handler if present
+    if _file_handler is not None:
+        try:
+            _file_handler.flush()
+        except Exception:
+            pass
+        try:
+            _file_handler.close()
+        except Exception:
+            pass
+        _file_handler = None
+
+    # Remove handlers previously added by this module
+    root_logger = logging.getLogger()
+    for handler in _managed_handlers:
+        try:
+            handler.flush()
+        except Exception:
+            pass
+        try:
+            handler.close()
+        except Exception:
+            pass
+        root_logger.removeHandler(handler)
+    _managed_handlers = []
 
 
 class JSONFormatter(logging.Formatter):
@@ -240,32 +278,20 @@ def configure_logging() -> None:
 
     Should be called once during application startup.
     """
-    global _file_log_listener, _managed_handlers
+    global _file_log_listener, _managed_handlers, _file_handler
 
     # Get root logger
     root_logger = logging.getLogger()
 
-    # Stop previous file listener if present
-    if _file_log_listener is not None:
-        try:
-            _file_log_listener.stop()
-        finally:
-            _file_log_listener = None
+    # Clean up prior logging state owned by this module
+    shutdown_logging()
 
-    # Remove handlers previously added by this module
-    for handler in _managed_handlers:
-        try:
-            handler.flush()
-        except Exception:
-            # Best-effort cleanup: ignore errors when flushing handlers
-            pass
-        try:
-            handler.close()
-        except Exception:
-            # Best-effort cleanup: ignore errors when closing handlers
-            pass
-        root_logger.removeHandler(handler)
-    _managed_handlers = []
+    # Avoid duplicate logging from uvicorn handlers
+    for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        uvicorn_logger = logging.getLogger(logger_name)
+        uvicorn_logger.propagate = True
+        for handler in uvicorn_logger.handlers[:]:
+            uvicorn_logger.removeHandler(handler)
 
     # Set log level
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -307,6 +333,7 @@ def configure_logging() -> None:
             file_handler.setLevel(log_level)
             file_handler.setFormatter(TextFormatter(use_colors=False))
             file_handler.addFilter(CorrelationIDFilter())
+            _file_handler = file_handler
 
             # Use a queue to avoid blocking the event loop on file I/O
             log_queue: queue.Queue[logging.LogRecord] = queue.Queue(-1)

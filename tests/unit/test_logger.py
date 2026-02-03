@@ -245,12 +245,11 @@ class TestTextFormatter:
             )
             outputs.append(formatter.format(record))
 
-        # All outputs should contain color codes
-        for output in outputs:
-            assert "\033[" in output
-
-        # Outputs should be different (different colors)
-        assert len(set(outputs)) == len(levels)
+        # Each output should contain the expected ANSI color code
+        for level, output in zip(levels, outputs, strict=True):
+            level_name = logging.getLevelName(level)
+            expected_color = TextFormatter.COLORS[level_name]
+            assert expected_color in output
 
 
 class TestCorrelationIDFilter:

@@ -9,13 +9,19 @@ import uuid
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.core.config import Environment, settings
-from app.core.logger import configure_logging, correlation_id_var, get_logger
+from app.core.logger import (
+    configure_logging,
+    correlation_id_var,
+    get_logger,
+    shutdown_logging,
+)
 from app.routers import health
 
 log = get_logger(__name__)
@@ -108,6 +114,19 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Log application shutdown."""
     log.info("Application shutting down")
+    shutdown_logging()
+
+
+def apply_security_headers(response: Response) -> Response:
+    """Add security headers to a response."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    if settings.app_env == Environment.PRODUCTION:
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
+    return response
 
 
 # Correlation ID and request logging middleware
@@ -178,11 +197,9 @@ async def correlation_id_middleware(
         return response
     except HTTPException as exc:
         duration_ms = (time.perf_counter() - start_time) * 1000
-        response = JSONResponse(
-            status_code=exc.status_code,
-            content={"detail": exc.detail},
-        )
+        response = await http_exception_handler(request, exc)
         response.headers["X-Correlation-ID"] = correlation_id
+        apply_security_headers(response)
         log.warning(
             "Request failed",
             extra={
@@ -200,6 +217,7 @@ async def correlation_id_middleware(
             content={"detail": "Internal Server Error"},
         )
         response.headers["X-Correlation-ID"] = correlation_id
+        apply_security_headers(response)
         log.exception(
             "Request failed",
             extra={
@@ -229,23 +247,7 @@ async def add_security_headers(
         Response with added security headers.
     """
     response = await call_next(request)
-
-    # Prevent MIME type sniffing
-    response.headers["X-Content-Type-Options"] = "nosniff"
-
-    # Prevent clickjacking
-    response.headers["X-Frame-Options"] = "DENY"
-
-    # XSS protection (legacy, but still useful for older browsers)
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-
-    # HSTS (only in production)
-    if settings.app_env == Environment.PRODUCTION:
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains"
-        )
-
-    return response
+    return apply_security_headers(response)
 
 
 # Register routers
