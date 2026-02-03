@@ -5,23 +5,19 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-
-
-@pytest.fixture
-def client():
-    """Create a test client for the FastAPI app."""
-    return TestClient(app)
+pytestmark = pytest.mark.integration
 
 
 class TestCorrelationIDMiddleware:
     """Test correlation ID middleware functionality."""
 
-    def test_generates_correlation_id_when_missing(self, client):
+    def test_generates_correlation_id_when_missing(
+        self, test_client: TestClient
+    ):
         """Test that middleware generates correlation ID if not provided."""
         import uuid
 
-        response = client.get("/health")
+        response = test_client.get("/health")
 
         assert response.status_code == 200
         assert "X-Correlation-ID" in response.headers
@@ -29,10 +25,10 @@ class TestCorrelationIDMiddleware:
         correlation_id = response.headers["X-Correlation-ID"]
         assert uuid.UUID(correlation_id)
 
-    def test_uses_provided_correlation_id(self, client):
+    def test_uses_provided_correlation_id(self, test_client: TestClient):
         """Test that middleware uses correlation ID from request header."""
         test_correlation_id = "test-correlation-123"
-        response = client.get(
+        response = test_client.get(
             "/health",
             headers={"X-Correlation-ID": test_correlation_id},
         )
@@ -40,12 +36,12 @@ class TestCorrelationIDMiddleware:
         assert response.status_code == 200
         assert response.headers["X-Correlation-ID"] == test_correlation_id
 
-    def test_correlation_id_in_logs(self, client, caplog):
+    def test_correlation_id_in_logs(self, test_client: TestClient, caplog):
         """Test that correlation ID appears in log output."""
         test_correlation_id = "test-log-correlation-456"
 
         with caplog.at_level(logging.INFO):
-            response = client.get(
+            response = test_client.get(
                 "/health",
                 headers={"X-Correlation-ID": test_correlation_id},
             )
@@ -66,24 +62,28 @@ class TestCorrelationIDMiddleware:
 class TestRequestLogging:
     """Test request/response logging."""
 
-    def test_logs_request_start_and_completion(self, client, caplog):
+    def test_logs_request_start_and_completion(
+        self, test_client: TestClient, caplog
+    ):
         """Test that requests are logged with start and completion."""
         with caplog.at_level(logging.INFO):
-            response = client.get("/health")
+            response = test_client.get("/health")
 
             assert response.status_code == 200
 
             # Check for request-related log messages
-            log_messages = [record.message for record in caplog.records]
+            log_messages = [record.getMessage() for record in caplog.records]
             assert any(
                 "Request started" in msg or "Request completed" in msg
                 for msg in log_messages
             )
 
-    def test_logs_request_method_and_path(self, client, caplog):
+    def test_logs_request_method_and_path(
+        self, test_client: TestClient, caplog
+    ):
         """Test that request method and path are logged."""
         with caplog.at_level(logging.INFO):
-            response = client.get("/health")
+            response = test_client.get("/health")
 
             assert response.status_code == 200
 
@@ -101,10 +101,10 @@ class TestRequestLogging:
 
             assert found_request_info
 
-    def test_logs_duration(self, client, caplog):
+    def test_logs_duration(self, test_client: TestClient, caplog):
         """Test that request duration is logged."""
         with caplog.at_level(logging.INFO):
-            response = client.get("/health")
+            response = test_client.get("/health")
 
             assert response.status_code == 200
 
@@ -117,11 +117,13 @@ class TestRequestLogging:
 
             assert found_duration
 
-    def test_logs_error_responses_as_warning(self, client, caplog):
+    def test_logs_error_responses_as_warning(
+        self, test_client: TestClient, caplog
+    ):
         """Test that 4xx/5xx responses are logged at warning level."""
         with caplog.at_level(logging.WARNING):
             # Try to access a non-existent endpoint
-            response = client.get("/nonexistent")
+            response = test_client.get("/nonexistent")
 
             assert response.status_code == 404
 
@@ -142,17 +144,19 @@ class TestRequestLogging:
 class TestLifecycleLogging:
     """Test application lifecycle event logging."""
 
-    def test_startup_logs_application_info(self, caplog):
+    def test_startup_logs_application_info(
+        self, test_client: TestClient, caplog
+    ):
         """Test that startup event logs application information."""
         from app import __version__
 
         # Startup events happen when app is created, so we use caplog to capture
         with caplog.at_level(logging.INFO):
-            # Create a new client to trigger startup
-            client = TestClient(app)
+            # Touch the client to trigger startup if not already
+            test_client.get("/health")
 
             # Check for startup-related logs
-            log_messages = [record.message for record in caplog.records]
+            log_messages = [record.getMessage() for record in caplog.records]
             log_text = " ".join(log_messages).lower()
 
             # Check if startup was logged or if version info is present
@@ -165,16 +169,17 @@ class TestLifecycleLogging:
             # Note: startup event might have already been triggered
             # by previous tests, so we check for either startup or just
             # that the client was created successfully
-            assert startup_logged or client is not None
+            assert startup_logged or test_client is not None
 
     def test_shutdown_logs_message(self, caplog):
         """Test that shutdown event logs a message."""
+        from app.main import app
+
         with caplog.at_level(logging.INFO):
-            client = TestClient(app)
+            with TestClient(app):
+                pass
 
-            # Close the client to trigger shutdown
-            client.close()
-
-            # Note: Shutdown logging in tests can be unreliable
-            # We just verify the client can be closed without errors
-            assert True  # If we got here, shutdown completed without error
+        log_messages = [record.getMessage() for record in caplog.records]
+        assert any(
+            "shutting down" in message.lower() for message in log_messages
+        )

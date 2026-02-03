@@ -43,6 +43,33 @@ sanitizer = Sanitizer(
     }
 )
 
+# LogRecord attributes to exclude from extra field output
+EXCLUDED_LOG_RECORD_ATTRS = {
+    "name",
+    "msg",
+    "args",
+    "created",
+    "filename",
+    "funcName",
+    "levelname",
+    "levelno",
+    "lineno",
+    "module",
+    "msecs",
+    "message",
+    "pathname",
+    "process",
+    "processName",
+    "relativeCreated",
+    "thread",
+    "threadName",
+    "correlation_id",
+    "exc_info",
+    "exc_text",
+    "stack_info",
+    "taskName",
+}
+
 
 class JSONFormatter(logging.Formatter):
     """JSON log formatter for production use.
@@ -80,32 +107,7 @@ class JSONFormatter(logging.Formatter):
         extra_fields = {
             key: value
             for key, value in record.__dict__.items()
-            if key
-            not in {
-                "name",
-                "msg",
-                "args",
-                "created",
-                "filename",
-                "funcName",
-                "levelname",
-                "levelno",
-                "lineno",
-                "module",
-                "msecs",
-                "message",
-                "pathname",
-                "process",
-                "processName",
-                "relativeCreated",
-                "thread",
-                "threadName",
-                "correlation_id",
-                "exc_info",
-                "exc_text",
-                "stack_info",
-                "taskName",
-            }
+            if key not in EXCLUDED_LOG_RECORD_ATTRS
         }
 
         if extra_fields:
@@ -134,7 +136,6 @@ class TextFormatter(logging.Formatter):
         "CRITICAL": "\033[31m\033[1m",  # Red + Bold
     }
     RESET = "\033[0m"
-    BOLD = "\033[1m"
 
     def __init__(self, use_colors: bool = True) -> None:
         """Initialize the formatter.
@@ -182,32 +183,7 @@ class TextFormatter(logging.Formatter):
         extra_fields = {
             key: value
             for key, value in record.__dict__.items()
-            if key
-            not in {
-                "name",
-                "msg",
-                "args",
-                "created",
-                "filename",
-                "funcName",
-                "levelname",
-                "levelno",
-                "lineno",
-                "module",
-                "msecs",
-                "message",
-                "pathname",
-                "process",
-                "processName",
-                "relativeCreated",
-                "thread",
-                "threadName",
-                "correlation_id",
-                "exc_info",
-                "exc_text",
-                "stack_info",
-                "taskName",
-            }
+            if key not in EXCLUDED_LOG_RECORD_ATTRS
         }
 
         if extra_fields:
@@ -286,8 +262,8 @@ def configure_logging() -> None:
     # For TEXT format, also log to file for easier debugging
     if settings.log_format.upper() == "TEXT":
         # Create logs directory if it doesn't exist
-        logs_dir = Path("logs")
-        logs_dir.mkdir(exist_ok=True)
+        logs_dir = Path(__file__).resolve().parents[2] / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
 
         # Create timestamped log filename
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")

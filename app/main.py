@@ -3,6 +3,7 @@
 Main application factory with CORS middleware and router registration.
 """
 
+import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -82,7 +83,8 @@ app.add_middleware(
     allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Correlation-ID"],
+    expose_headers=["X-Correlation-ID"],
 )
 
 
@@ -126,48 +128,56 @@ async def correlation_id_middleware(
         Response with X-Correlation-ID header added.
     """
     # Extract or generate correlation ID
-    correlation_id = request.headers.get("X-Correlation-ID") or str(
-        uuid.uuid4()
-    )
+    correlation_id = str(uuid.uuid4())
+    raw_correlation_id = request.headers.get("X-Correlation-ID")
+    if raw_correlation_id:
+        candidate = raw_correlation_id.strip()
+        if len(candidate) <= 64 and re.fullmatch(r"[A-Za-z0-9._-]+", candidate):
+            correlation_id = candidate
 
     # Store in context for this request
-    correlation_id_var.set(correlation_id)
+    token = correlation_id_var.set(correlation_id)
 
-    # Log request start
-    logger.info(
-        "Request started",
-        extra={
-            "request_method": request.method,
-            "request_path": str(request.url.path),
-            "request_query": (
-                str(request.url.query) if request.url.query else None
-            ),
-            "client_host": request.client.host if request.client else None,
-            "user_agent": request.headers.get("user-agent"),
-        },
-    )
+    try:
+        # Log request start
+        logger.info(
+            "Request started",
+            extra={
+                "request_method": request.method,
+                "request_path": str(request.url.path),
+                "request_query_keys": (
+                    list(request.query_params.keys())
+                    if request.query_params
+                    else None
+                ),
+                "client_host": request.client.host if request.client else None,
+                "user_agent": request.headers.get("user-agent"),
+            },
+        )
 
-    # Process request and measure duration
-    start_time = time.perf_counter()
-    response = await call_next(request)
-    duration_ms = (time.perf_counter() - start_time) * 1000
+        # Process request and measure duration
+        start_time = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start_time) * 1000
 
-    # Add correlation ID to response headers
-    response.headers["X-Correlation-ID"] = correlation_id
+        # Add correlation ID to response headers
+        response.headers["X-Correlation-ID"] = correlation_id
 
-    # Log request completion
-    log_level = "warning" if response.status_code >= 400 else "info"
-    getattr(logger, log_level)(
-        "Request completed",
-        extra={
-            "request_method": request.method,
-            "request_path": str(request.url.path),
-            "response_status": response.status_code,
-            "duration_ms": round(duration_ms, 2),
-        },
-    )
+        # Log request completion
+        log_level = "warning" if response.status_code >= 400 else "info"
+        getattr(logger, log_level)(
+            "Request completed",
+            extra={
+                "request_method": request.method,
+                "request_path": str(request.url.path),
+                "response_status": response.status_code,
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
 
-    return response
+        return response
+    finally:
+        correlation_id_var.reset(token)
 
 
 # Security headers middleware

@@ -35,11 +35,8 @@ async def health_check(response: Response) -> Dict[str, Any]:
             # TODO: Add actual database ping when database is set up
             # await database.execute("SELECT 1")
             health_status["checks"]["database"] = "not_implemented"
-        except Exception as e:
-            logger.error(
-                "Database health check failed",
-                extra={"error": str(e)},
-            )
+        except Exception:
+            logger.exception("Database health check failed")
             health_status["checks"]["database"] = "error"
             health_status["status"] = "degraded"
 
@@ -49,11 +46,8 @@ async def health_check(response: Response) -> Dict[str, Any]:
             # TODO: Add actual Redis ping when Redis is set up
             # await redis.ping()
             health_status["checks"]["redis"] = "not_implemented"
-        except Exception as e:
-            logger.error(
-                "Redis health check failed",
-                extra={"error": str(e)},
-            )
+        except Exception:
+            logger.exception("Redis health check failed")
             health_status["checks"]["redis"] = "error"
             health_status["status"] = "degraded"
 

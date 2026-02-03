@@ -3,6 +3,8 @@
 import json
 import logging
 
+import pytest
+
 from app.core.logger import (
     CorrelationIDFilter,
     JSONFormatter,
@@ -10,6 +12,8 @@ from app.core.logger import (
     correlation_id_var,
     sanitizer,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestSanitizer:

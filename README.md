@@ -332,7 +332,9 @@ LOG_LEVEL=INFO        # DEBUG, INFO, WARNING, ERROR, CRITICAL
 LOG_FORMAT=TEXT       # TEXT (colored, human-readable) or JSON (structured)
 ```
 
-**Note:** When using TEXT format, logs are automatically saved to `backend/logs/` directory with timestamped filenames (e.g., `lemello_20260202_153045.log`) for easier debugging. This directory is git-ignored.
+**Note:** When using TEXT format, logs are automatically saved to `backend/logs/`
+directory with timestamped filenames (e.g., `lemello_20260202_153045.log`) for
+easier debugging. This directory is git-ignored.
 
 #### Log Formats
 
@@ -418,7 +420,7 @@ logger.info(
     "User login",
     extra={
         "username": "test@example.com",
-        "password": "secret123",  # Automatically becomes "***REDACTED***"
+        "password": "secret123",  # Automatically becomes "********"
     }
 )
 ```
