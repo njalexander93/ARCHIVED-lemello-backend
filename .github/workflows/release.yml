@@ -3,13 +3,13 @@ name: Release Pipeline
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '**.md'           # Skip markdown files (README, docs)
-      - 'docs/**'         # Skip docs directory
-      - 'scripts/**'      # Skip utility/test scripts
-      - '.github/**'      # Skip workflow changes (use separate workflow for that)
-      - 'LICENSE'         # Skip license changes
-      - '.gitignore'      # Skip gitignore changes
+    paths:
+      - 'tests/**'
+      - '.github/workflows/release.yml'
+      - 'app/**'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+      - 'uv.lock'
 
 # Prevent concurrent releases - queue them instead
 concurrency:
@@ -22,11 +22,11 @@ permissions:
 
 jobs:
   test:
-    name: Full Test Suite
+    name: Continuous Integration
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up Python 3.14
@@ -40,35 +40,48 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: uv sync --frozen --all-extras
 
-      - name: Run unit tests
+      - name: Unit Tests
         run: uv run pytest tests/unit/ -v
 
-      - name: Run integration tests
+      - name: Integration Tests
         run: uv run pytest tests/integration/ -v
 
-      - name: Run e2e tests
+      - name: E2E Tests
         run: uv run pytest tests/e2e/ -v
 
   build-and-release:
-    name: Build and Release
+    name: Continuous Deployment
     needs: test
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Extract version
+      - name: Check for release-path changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            release_paths:
+              - 'app/**'
+              - 'pyproject.toml'
+              - 'Dockerfile'
+              - 'uv.lock'
+
+      - name: Extract Version
+        if: steps.filter.outputs.release_paths == 'true'
         id: version
         run: |
           VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Verify version is unique
+      - name: Check Duplicate Version
+        if: steps.filter.outputs.release_paths == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -82,13 +95,15 @@ jobs:
           echo "✅ Version v${{ steps.version.outputs.version }} is unique"
 
       - name: Log in to GitHub Container Registry
+        if: steps.filter.outputs.release_paths == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and Push Docker Image
+        if: steps.filter.outputs.release_paths == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -100,6 +115,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/backend:latest
 
       - name: Create GitHub Release
+        if: steps.filter.outputs.release_paths == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -115,3 +131,7 @@ jobs:
             ### Changes
             See commit history for details." \
             --repo ${{ github.repository }}
+
+      - name: Skip deployment for test-only changes
+        if: steps.filter.outputs.release_paths == 'false'
+        run: echo "✅ No release-path changes detected; deployment skipped."
