@@ -1,42 +1,64 @@
+"""Alembic migration environment configuration.
+
+Integrates with Lemello's Pydantic Settings for database URL
+injection and registers pgvector types for autogenerate support.
+"""
+
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
+import pgvector.sqlalchemy
+
+# Import application settings and Base metadata
+from app.core.config import settings
+from app.core.database import Base
+
+# -------------------------------------------------------------------
+# Future models must be imported here (or in database.py) so that
+# Base.metadata includes their table definitions for autogenerate.
+#
+# Example:
+#   from app.models.recipe import Recipe  # noqa: F401
+# -------------------------------------------------------------------
+
+# Alembic Config object (provides access to alembic.ini values)
 config = context.config
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# Set up Python logging from alembic.ini [loggers] section
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+# Override alembic.ini placeholder with real URL from Pydantic Settings
+if settings.database_url:
+    config.set_main_option("sqlalchemy.url", settings.database_url)
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+# Target metadata for autogenerate support
+target_metadata = Base.metadata
+
+
+def _register_pgvector_types(connection):
+    """Register pgvector custom types in the PostgreSQL dialect.
+
+    Without this, Alembic autogenerate will emit warnings like:
+        SAWarning: Did not recognize type 'vector' of column 'embedding'
+    and may generate incorrect migrations for vector columns.
+    """
+    dialect = connection.dialect
+    dialect.ischema_names["vector"] = pgvector.sqlalchemy.Vector
+    # Register additional types for future use
+    if hasattr(pgvector.sqlalchemy, "HALFVEC"):
+        dialect.ischema_names["halfvec"] = pgvector.sqlalchemy.HALFVEC
+    if hasattr(pgvector.sqlalchemy, "SPARSEVEC"):
+        dialect.ischema_names["sparsevec"] = pgvector.sqlalchemy.SPARSEVEC
 
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
+    Generates SQL script output without connecting to the database.
+    Useful for generating migration SQL for review.
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -44,6 +66,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        compare_type=True,
     )
 
     with context.begin_transaction():
@@ -53,9 +76,9 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
+    Creates a database connection and runs migrations within
+    a transaction. Uses NullPool because migrations are
+    short-lived — connection pooling adds overhead with no benefit.
     """
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
@@ -64,8 +87,13 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Register pgvector types before configuring context
+        _register_pgvector_types(connection)
+
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            compare_type=True,
         )
 
         with context.begin_transaction():
