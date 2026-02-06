@@ -52,7 +52,11 @@ def _register_pgvector_types(connection: Connection) -> None:
     and may generate incorrect migrations for vector columns.
     """
     dialect = connection.dialect
-    ischema_names = dialect.ischema_names  # type: ignore[attr-defined]
+    if getattr(dialect, "name", None) != "postgresql":
+        return
+    ischema_names = getattr(dialect, "ischema_names", None)
+    if ischema_names is None:
+        return
     ischema_names["vector"] = pgvector.sqlalchemy.Vector
     # Register additional types for future use
     if hasattr(pgvector.sqlalchemy, "HALFVEC"):

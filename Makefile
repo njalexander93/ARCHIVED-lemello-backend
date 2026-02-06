@@ -57,13 +57,13 @@ ci:  ## Run all CI checks (lint, type-check, test)
 	@echo "✅ All CI checks passed!"
 
 bump-major:  ## Bump major version and update uv.lock
-	@BUMP=major python3.14 scripts/bump_version.py
+	@BUMP=major uv run python scripts/bump_version.py
 	uv sync --all-extras
 
 bump-minor:  ## Bump minor version and update uv.lock
-	@BUMP=minor python3.14 scripts/bump_version.py
+	@BUMP=minor uv run python scripts/bump_version.py
 	uv sync --all-extras
 
 bump-patch:  ## Bump patch version and update uv.lock
-	@BUMP=patch python3.14 scripts/bump_version.py
+	@BUMP=patch uv run python scripts/bump_version.py
 	uv sync --all-extras

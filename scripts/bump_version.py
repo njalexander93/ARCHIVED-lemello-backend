@@ -9,12 +9,14 @@ from __future__ import annotations
 import os
 import re
 import sys
+import tempfile
+from pathlib import Path
 
 
 def main() -> int:
     """Run the version bump."""
-    path = "pyproject.toml"
-    text = open(path, "r", encoding="utf-8").read()
+    path = Path("pyproject.toml")
+    text = path.read_text(encoding="utf-8")
     match = re.search(r'(?m)^version = "(\d+)\.(\d+)\.(\d+)"\s*$', text)
     if not match:
         print("version not found in pyproject.toml", file=sys.stderr)
@@ -42,7 +44,15 @@ def main() -> int:
         text,
         count=1,
     )
-    open(path, "w", encoding="utf-8").write(text)
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=str(path.parent),
+        delete=False,
+    ) as tmp_file:
+        tmp_file.write(text)
+        tmp_name = tmp_file.name
+    Path(tmp_name).replace(path)
     print(f"Bumped version to {major}.{minor}.{patch}")
     return 0
 
