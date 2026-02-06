@@ -9,6 +9,7 @@ from logging.config import fileConfig
 import pgvector.sqlalchemy
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import Connection
 
 # Import application settings and Base metadata
 from app.core.config import settings
@@ -30,14 +31,20 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Override alembic.ini placeholder with real URL from Pydantic Settings
-if settings.database_url:
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+database_url = settings.database_url
+if not database_url:
+    raise ValueError(
+        "Database URL is not configured. "
+        "Set a valid 'database_url' in app.core.config.Settings before "
+        "running migrations."
+    )
+config.set_main_option("sqlalchemy.url", database_url)
 
 # Target metadata for autogenerate support
 target_metadata = Base.metadata
 
 
-def _register_pgvector_types(connection):
+def _register_pgvector_types(connection: Connection) -> None:
     """Register pgvector custom types in the PostgreSQL dialect.
 
     Without this, Alembic autogenerate will emit warnings like:
@@ -45,12 +52,13 @@ def _register_pgvector_types(connection):
     and may generate incorrect migrations for vector columns.
     """
     dialect = connection.dialect
-    dialect.ischema_names["vector"] = pgvector.sqlalchemy.Vector
+    ischema_names = dialect.ischema_names  # type: ignore[attr-defined]
+    ischema_names["vector"] = pgvector.sqlalchemy.Vector
     # Register additional types for future use
     if hasattr(pgvector.sqlalchemy, "HALFVEC"):
-        dialect.ischema_names["halfvec"] = pgvector.sqlalchemy.HALFVEC
+        ischema_names["halfvec"] = pgvector.sqlalchemy.HALFVEC
     if hasattr(pgvector.sqlalchemy, "SPARSEVEC"):
-        dialect.ischema_names["sparsevec"] = pgvector.sqlalchemy.SPARSEVEC
+        ischema_names["sparsevec"] = pgvector.sqlalchemy.SPARSEVEC
 
 
 def run_migrations_offline() -> None:
@@ -67,6 +75,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         # Keep type comparisons on so pgvector column changes are detected.
         compare_type=True,
+        compare_server_default=False,
     )
 
     with context.begin_transaction():
@@ -96,6 +105,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             # Ensure Alembic emits diffs when column types change.
             compare_type=True,
+            compare_server_default=False,
         )
 
         with context.begin_transaction():

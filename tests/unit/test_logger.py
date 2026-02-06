@@ -20,21 +20,21 @@ pytestmark = pytest.mark.unit
 class TestSanitizer:
     """Test sanitary-based sensitive data sanitization."""
 
-    def test_sanitize_simple_password(self):
+    def test_sanitize_simple_password(self) -> None:
         """Test that password field is redacted."""
         data = {"username": "test", "password": "secret123"}
         result = sanitizer.sanitize(data)
         assert result["username"] == "test"
         assert result["password"] == "********"
 
-    def test_sanitize_case_insensitive(self):
+    def test_sanitize_case_insensitive(self) -> None:
         """Test that sanitization is case-insensitive."""
         data = {"Password": "secret", "TOKEN": "abc123"}
         result = sanitizer.sanitize(data)
         assert result["Password"] == "********"
         assert result["TOKEN"] == "********"
 
-    def test_sanitize_nested_dict(self):
+    def test_sanitize_nested_dict(self) -> None:
         """Test that nested dictionaries are sanitized."""
         data = {
             "user": {"name": "test", "password": "secret"},
@@ -45,7 +45,7 @@ class TestSanitizer:
         assert result["user"]["password"] == "********"
         assert result["api_key"] == "********"
 
-    def test_sanitize_list_of_dicts(self):
+    def test_sanitize_list_of_dicts(self) -> None:
         """Test that lists containing dicts are sanitized."""
         data = {
             "users": [
@@ -59,7 +59,7 @@ class TestSanitizer:
         assert result["users"][1]["name"] == "user2"
         assert result["users"][1]["secret"] == "********"
 
-    def test_sanitize_preserves_safe_fields(self):
+    def test_sanitize_preserves_safe_fields(self) -> None:
         """Test that non-sensitive fields are preserved."""
         data = {
             "username": "test",
@@ -73,7 +73,7 @@ class TestSanitizer:
 class TestJSONFormatter:
     """Test JSON log formatter."""
 
-    def test_format_basic_record(self):
+    def test_format_basic_record(self) -> None:
         """Test formatting a basic log record."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
@@ -95,7 +95,7 @@ class TestJSONFormatter:
         assert "timestamp" in log_dict
         assert "pid" in log_dict
 
-    def test_format_with_extra_fields(self):
+    def test_format_with_extra_fields(self) -> None:
         """Test formatting with extra fields."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
@@ -117,7 +117,7 @@ class TestJSONFormatter:
         assert str(log_dict["user_id"]) == "12345"
         assert log_dict["action"] == "create"
 
-    def test_format_with_correlation_id(self):
+    def test_format_with_correlation_id(self) -> None:
         """Test formatting with correlation ID."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
@@ -136,7 +136,7 @@ class TestJSONFormatter:
 
         assert log_dict["correlation_id"] == "req_abc123"
 
-    def test_format_sanitizes_sensitive_data(self):
+    def test_format_sanitizes_sensitive_data(self) -> None:
         """Test that sensitive data in extra fields is sanitized."""
         formatter = JSONFormatter()
         record = logging.LogRecord(
@@ -161,7 +161,7 @@ class TestJSONFormatter:
 class TestTextFormatter:
     """Test text log formatter."""
 
-    def test_format_basic_record(self):
+    def test_format_basic_record(self) -> None:
         """Test formatting a basic log record."""
         formatter = TextFormatter()
         record = logging.LogRecord(
@@ -181,7 +181,7 @@ class TestTextFormatter:
         # Should contain ANSI color codes
         assert "\033[" in output
 
-    def test_format_with_correlation_id(self):
+    def test_format_with_correlation_id(self) -> None:
         """Test formatting with correlation ID."""
         formatter = TextFormatter()
         record = logging.LogRecord(
@@ -199,7 +199,7 @@ class TestTextFormatter:
 
         assert "[req_abc123]" in output
 
-    def test_format_with_extra_fields(self):
+    def test_format_with_extra_fields(self) -> None:
         """Test formatting with extra fields (should be indented)."""
         formatter = TextFormatter()
         record = logging.LogRecord(
@@ -221,7 +221,7 @@ class TestTextFormatter:
         # Extra fields should be indented
         assert "\n  " in output
 
-    def test_format_different_levels(self):
+    def test_format_different_levels(self) -> None:
         """Test that different log levels have different colors."""
         formatter = TextFormatter()
 
@@ -256,7 +256,7 @@ class TestTextFormatter:
 class TestCorrelationIDFilter:
     """Test correlation ID filter."""
 
-    def test_filter_adds_correlation_id(self):
+    def test_filter_adds_correlation_id(self) -> None:
         """Test that filter adds correlation ID from context."""
         token = correlation_id_var.set("test_correlation_id")
         filter_obj = CorrelationIDFilter()
@@ -348,7 +348,7 @@ class TestFileLogging:
             settings.log_file_enabled = original_enabled
             logger_module.shutdown_logging()
 
-    def test_filter_without_correlation_id(self):
+    def test_filter_without_correlation_id(self) -> None:
         """Test that filter handles missing correlation ID gracefully."""
         token = correlation_id_var.set("")
         filter_obj = CorrelationIDFilter()

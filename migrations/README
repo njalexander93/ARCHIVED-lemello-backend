@@ -1,1 +1,10 @@
-Generic single-database configuration.
+Migrations for Lemello backend (Alembic).
+
+Common commands:
+- Apply latest migrations: uv run alembic upgrade head
+- Create a new migration: uv run alembic revision --autogenerate -m "describe change"
+- Roll back last migration: uv run alembic downgrade -1
+
+Notes:
+- The database URL is loaded from app.core.config.settings.database_url.
+- pgvector types are registered in migrations/env.py for autogenerate support.
