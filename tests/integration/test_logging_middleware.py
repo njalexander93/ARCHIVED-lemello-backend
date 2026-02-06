@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from pytest import LogCaptureFixture
 
 pytestmark = pytest.mark.integration
 
@@ -14,7 +15,7 @@ class TestCorrelationIDMiddleware:
 
     def test_generates_correlation_id_when_missing(
         self, test_client: TestClient
-    ):
+    ) -> None:
         """Test that middleware generates correlation ID if not provided."""
         import uuid
 
@@ -26,7 +27,9 @@ class TestCorrelationIDMiddleware:
         correlation_id = response.headers["X-Correlation-ID"]
         assert uuid.UUID(correlation_id)
 
-    def test_uses_provided_correlation_id(self, test_client: TestClient):
+    def test_uses_provided_correlation_id(
+        self, test_client: TestClient
+    ) -> None:
         """Test that middleware uses correlation ID from request header."""
         test_correlation_id = "test-correlation-123"
         response = test_client.get(
@@ -37,7 +40,11 @@ class TestCorrelationIDMiddleware:
         assert response.status_code == 200
         assert response.headers["X-Correlation-ID"] == test_correlation_id
 
-    def test_correlation_id_in_logs(self, test_client: TestClient, caplog):
+    def test_correlation_id_in_logs(
+        self,
+        test_client: TestClient,
+        caplog: LogCaptureFixture,
+    ) -> None:
         """Test that correlation ID appears in log output."""
         test_correlation_id = "test-log-correlation-456"
 
@@ -64,8 +71,10 @@ class TestRequestLogging:
     """Test request/response logging."""
 
     def test_logs_request_start_and_completion(
-        self, test_client: TestClient, caplog
-    ):
+        self,
+        test_client: TestClient,
+        caplog: LogCaptureFixture,
+    ) -> None:
         """Test that requests are logged with start and completion."""
         with caplog.at_level(logging.INFO):
             response = test_client.get("/health")
@@ -78,8 +87,10 @@ class TestRequestLogging:
             assert any("Request completed" in msg for msg in log_messages)
 
     def test_logs_request_method_and_path(
-        self, test_client: TestClient, caplog
-    ):
+        self,
+        test_client: TestClient,
+        caplog: LogCaptureFixture,
+    ) -> None:
         """Test that request method and path are logged."""
         with caplog.at_level(logging.INFO):
             response = test_client.get("/health")
@@ -100,7 +111,11 @@ class TestRequestLogging:
 
             assert found_request_info
 
-    def test_logs_duration(self, test_client: TestClient, caplog):
+    def test_logs_duration(
+        self,
+        test_client: TestClient,
+        caplog: LogCaptureFixture,
+    ) -> None:
         """Test that request duration is logged."""
         with caplog.at_level(logging.INFO):
             response = test_client.get("/health")
@@ -117,8 +132,10 @@ class TestRequestLogging:
             assert found_duration
 
     def test_logs_error_responses_as_warning(
-        self, test_client: TestClient, caplog
-    ):
+        self,
+        test_client: TestClient,
+        caplog: LogCaptureFixture,
+    ) -> None:
         """Test that 4xx/5xx responses are logged at warning level."""
         with caplog.at_level(logging.WARNING):
             # Try to access a non-existent endpoint
@@ -172,7 +189,10 @@ class TestUnhandledExceptions:
 class TestLifecycleLogging:
     """Test application lifecycle event logging."""
 
-    def test_startup_logs_application_info(self, caplog):
+    def test_startup_logs_application_info(
+        self,
+        caplog: LogCaptureFixture,
+    ) -> None:
         """Test that startup event logs application information."""
         from app import __version__
         from app.main import app
@@ -195,7 +215,10 @@ class TestLifecycleLogging:
 
         assert startup_logged
 
-    def test_shutdown_logs_message(self, caplog):
+    def test_shutdown_logs_message(
+        self,
+        caplog: LogCaptureFixture,
+    ) -> None:
         """Test that shutdown event logs a message."""
         from app.main import app
 
