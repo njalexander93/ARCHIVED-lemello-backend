@@ -24,6 +24,13 @@ def main() -> int:
 
     major, minor, patch = (int(value) for value in match.groups())
     bump = os.environ.get("BUMP")
+    if bump is None:
+        print(
+            "BUMP environment variable is required "
+            "(must be one of: major, minor, patch).",
+            file=sys.stderr,
+        )
+        return 1
     if bump == "major":
         major += 1
         minor = 0

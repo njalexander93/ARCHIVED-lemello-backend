@@ -53,6 +53,9 @@ def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
 
     Returns:
         A sessionmaker instance for creating database sessions.
+
+    Raises:
+        ValueError: If no database URL is configured.
     """
     # Use a fresh engine so tests can override settings cleanly.
     engine = get_engine(url)
