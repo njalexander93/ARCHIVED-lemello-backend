@@ -38,7 +38,7 @@ if not database_url:
         "Set a valid 'database_url' in app.core.config.Settings before "
         "running migrations."
     )
-config.set_main_option("sqlalchemy.url", database_url)
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 # Target metadata for autogenerate support
 target_metadata = Base.metadata

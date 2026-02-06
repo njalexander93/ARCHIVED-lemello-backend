@@ -48,6 +48,10 @@ def test_get_engine_raises_when_missing_url(
 def test_get_session_factory_configuration() -> None:
     """Session factory uses expire_on_commit=False and binds an engine."""
     factory = get_session_factory("sqlite+pysqlite:///:memory:")
-    assert factory.kw["expire_on_commit"] is False
-    bind = factory.kw["bind"]
-    assert isinstance(bind, Engine)
+    session = factory()
+    try:
+        assert session.expire_on_commit is False
+        bind = session.get_bind()
+        assert isinstance(bind, Engine)
+    finally:
+        session.close()
