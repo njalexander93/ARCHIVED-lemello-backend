@@ -20,9 +20,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
+    # Extensions are managed via Alembic so environments stay consistent.
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
 
 def downgrade() -> None:
     """Downgrade schema."""
+    # Drop the extension on rollback to keep the migration reversible.
     op.execute("DROP EXTENSION IF EXISTS vector")

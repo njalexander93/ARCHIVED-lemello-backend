@@ -65,6 +65,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        # Keep type comparisons on so pgvector column changes are detected.
         compare_type=True,
     )
 
@@ -82,6 +83,7 @@ def run_migrations_online() -> None:
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
+        # Migrations are short-lived; pooling does not buy much here.
         poolclass=pool.NullPool,
     )
 
@@ -92,6 +94,7 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
+            # Ensure Alembic emits diffs when column types change.
             compare_type=True,
         )
 

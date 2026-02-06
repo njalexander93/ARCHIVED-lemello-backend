@@ -41,6 +41,7 @@ def get_engine(url: str | None = None) -> Engine:
             "DATABASE_URL is not configured. "
             "Set it in .env or as an environment variable."
         )
+    # Keep SQL echo aligned with debug mode for local troubleshooting.
     return create_engine(db_url, echo=settings.app_debug)
 
 
@@ -53,5 +54,7 @@ def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
     Returns:
         A sessionmaker instance for creating database sessions.
     """
+    # Use a fresh engine so tests can override settings cleanly.
     engine = get_engine(url)
+    # Avoid expiring instances on commit in request-scoped usage.
     return sessionmaker(bind=engine, expire_on_commit=False)
