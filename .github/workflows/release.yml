@@ -1,4 +1,4 @@
-name: Release Pipeline
+name: CI/CD
 
 on:
   push:
