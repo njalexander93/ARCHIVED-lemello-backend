@@ -119,7 +119,7 @@ uv run pytest tests/unit/ -x  # Fast unit tests, fail-fast mode
 uv run pytest tests/unit/ tests/integration/  # Unit + integration tests
 ```
 
-**Release Pipeline:**
+**CI/CD Pipeline (main):**
 ```bash
 uv run pytest  # All tests including e2e
 ```
