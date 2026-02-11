@@ -2,9 +2,6 @@ name: Linear Automation
 
 on:
   create:
-  pull_request:
-    branches: [main]
-    types: [opened, reopened, ready_for_review]
   push:
     branches: [main]
   release:
@@ -53,12 +50,29 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload
+            local payload response issue_id
+
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id identifier state { id name } } }", variables: {identifier: $identifier}}')"
-            curl -sS https://api.linear.app/graphql \
-              -H "Authorization: ${LINEAR_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
+            if [ -n "$issue_id" ]; then
+              echo "$response"
+              return 0
+            fi
+
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id identifier state { id name } } }", variables: {identifier: $identifier}}')"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            echo "$response"
           }
 
           linear_update_state() {
@@ -99,81 +113,6 @@ jobs:
             esac
           done
 
-  pr-ready-to-in-review:
-    name: PR Ready -> In Review
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    steps:
-      - name: Move referenced issues to In Review
-        env:
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${LINEAR_API_KEY:-}" ]; then
-            echo "LINEAR_API_KEY is not set; skipping."
-            exit 0
-          fi
-
-          extract_keys() {
-            local input="$1"
-            if [ -z "$input" ]; then
-              return 0
-            fi
-            printf "%s\n" "$input" \
-              | (grep -oiE 'LMLO-[0-9]+' || true) \
-              | tr '[:lower:]' '[:upper:]' \
-              | sort -u
-          }
-
-          linear_issue_by_identifier() {
-            local identifier="$1"
-            local payload
-            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
-            curl -sS https://api.linear.app/graphql \
-              -H "Authorization: ${LINEAR_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload"
-          }
-
-          linear_update_state() {
-            local issue_id="$1"
-            local state_id="$2"
-            local payload
-            payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
-            curl -sS https://api.linear.app/graphql \
-              -H "Authorization: ${LINEAR_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload" >/dev/null
-          }
-
-          mapfile -t KEYS < <(
-            {
-              extract_keys "${PR_HEAD_REF}"
-              extract_keys "${PR_TITLE}"
-              extract_keys "${PR_BODY}"
-            } | sort -u
-          )
-
-          if [ "${#KEYS[@]}" -eq 0 ]; then
-            echo "No LMLO keys found on PR context."
-            exit 0
-          fi
-
-          for key in "${KEYS[@]}"; do
-            issue_json="$(linear_issue_by_identifier "$key")"
-            issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
-            if [ -z "$issue_id" ]; then
-              echo "Issue ${key} not found in Linear; skipping."
-              continue
-            fi
-            echo "Moving ${key} to In Review."
-            linear_update_state "$issue_id" "${LINEAR_STATE_IN_REVIEW_ID}"
-          done
-
   push-main-to-done-or-staging:
     name: Merge to Main -> Done or Staging
     if: github.event_name == 'push'
@@ -206,12 +145,29 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload
+            local payload response issue_id
+
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
-            curl -sS https://api.linear.app/graphql \
-              -H "Authorization: ${LINEAR_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
+            if [ -n "$issue_id" ]; then
+              echo "$response"
+              return 0
+            fi
+
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            echo "$response"
           }
 
           linear_update_state() {
@@ -335,12 +291,29 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload
+            local payload response issue_id
+
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
-            curl -sS https://api.linear.app/graphql \
-              -H "Authorization: ${LINEAR_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
+            if [ -n "$issue_id" ]; then
+              echo "$response"
+              return 0
+            fi
+
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            echo "$response"
           }
 
           linear_update_state() {
@@ -444,12 +417,29 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload
+            local payload response issue_id
+
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
-            curl -sS https://api.linear.app/graphql \
-              -H "Authorization: ${LINEAR_API_KEY}" \
-              -H "Content-Type: application/json" \
-              -d "$payload"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
+            if [ -n "$issue_id" ]; then
+              echo "$response"
+              return 0
+            fi
+
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            response="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            echo "$response"
           }
 
           linear_update_state() {

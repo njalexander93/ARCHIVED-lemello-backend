@@ -66,13 +66,23 @@ jobs:
           fi
 
           ISSUE_QUERY="$(jq -n --arg identifier "${ISSUE_KEY}" '{query: "query($identifier: String!) { issue(identifier: $identifier) { title } }", variables: {identifier: $identifier}}')"
-          ISSUE_TITLE="$(
+          ISSUE_RESPONSE="$(
             curl -sS https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "${ISSUE_QUERY}" \
-              | jq -r '.data.issue.title // empty'
+              -d "${ISSUE_QUERY}"
           )"
+          ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty')"
+          if [ -z "${ISSUE_TITLE}" ]; then
+            ISSUE_QUERY="$(jq -n --arg identifier "${ISSUE_KEY}" '{query: "query($identifier: String!) { issue(id: $identifier) { title } }", variables: {identifier: $identifier}}')"
+            ISSUE_RESPONSE="$(
+              curl -sS https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "${ISSUE_QUERY}"
+            )"
+            ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty')"
+          fi
 
           if [ -z "${ISSUE_TITLE}" ]; then
             echo "Could not resolve Linear issue title for ${ISSUE_KEY}; title sync skipped."
