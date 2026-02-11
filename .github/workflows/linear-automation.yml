@@ -1,0 +1,499 @@
+name: Linear Automation
+
+on:
+  create:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, ready_for_review]
+  push:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_run:
+    workflows: ["CI/CD"]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  LINEAR_STATE_FAILED_CI_ID: ${{ vars.LINEAR_STATE_FAILED_CI_ID }}
+  LINEAR_STATE_DONE_ID: ${{ vars.LINEAR_STATE_DONE_ID }}
+  LINEAR_STATE_STAGING_ID: ${{ vars.LINEAR_STATE_STAGING_ID }}
+  LINEAR_STATE_IN_REVIEW_ID: ${{ vars.LINEAR_STATE_IN_REVIEW_ID }}
+  LINEAR_STATE_IN_PROGRESS_ID: ${{ vars.LINEAR_STATE_IN_PROGRESS_ID }}
+  LINEAR_STATE_RELEASE_ID: ${{ vars.LINEAR_STATE_RELEASE_ID }}
+
+jobs:
+  branch-created-to-in-progress:
+    name: Branch Created -> In Progress
+    if: github.event_name == 'create' && github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move issue from Backlog/Planned/Failed CI to In Progress
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          BRANCH_NAME: ${{ github.event.ref }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "LINEAR_API_KEY is not set; skipping."
+            exit 0
+          fi
+
+          extract_keys() {
+            local input="$1"
+            printf "%s\n" "$input" \
+              | (grep -oiE 'LMLO-[0-9]+' || true) \
+              | tr '[:lower:]' '[:upper:]' \
+              | sort -u
+          }
+
+          linear_issue_by_identifier() {
+            local identifier="$1"
+            local payload
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id identifier state { id name } } }", variables: {identifier: $identifier}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload"
+          }
+
+          linear_update_state() {
+            local issue_id="$1"
+            local state_id="$2"
+            local payload
+            payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" >/dev/null
+          }
+
+          mapfile -t KEYS < <(extract_keys "${BRANCH_NAME}" || true)
+          if [ "${#KEYS[@]}" -eq 0 ]; then
+            echo "No LMLO key found in branch '${BRANCH_NAME}'."
+            exit 0
+          fi
+
+          for key in "${KEYS[@]}"; do
+            issue_json="$(linear_issue_by_identifier "$key")"
+            issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
+            current_state_name="$(echo "$issue_json" | jq -r '.data.issue.state.name // empty')"
+
+            if [ -z "$issue_id" ]; then
+              echo "Issue ${key} not found in Linear; skipping."
+              continue
+            fi
+
+            case "$current_state_name" in
+              "Backlog"|"Planned"|"Failed CI")
+                echo "Moving ${key} to In Progress."
+                linear_update_state "$issue_id" "${LINEAR_STATE_IN_PROGRESS_ID}"
+                ;;
+              *)
+                echo "Skipping ${key}; current state is '${current_state_name}'."
+                ;;
+            esac
+          done
+
+  pr-ready-to-in-review:
+    name: PR Ready -> In Review
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move referenced issues to In Review
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "LINEAR_API_KEY is not set; skipping."
+            exit 0
+          fi
+
+          extract_keys() {
+            local input="$1"
+            if [ -z "$input" ]; then
+              return 0
+            fi
+            printf "%s\n" "$input" \
+              | (grep -oiE 'LMLO-[0-9]+' || true) \
+              | tr '[:lower:]' '[:upper:]' \
+              | sort -u
+          }
+
+          linear_issue_by_identifier() {
+            local identifier="$1"
+            local payload
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload"
+          }
+
+          linear_update_state() {
+            local issue_id="$1"
+            local state_id="$2"
+            local payload
+            payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" >/dev/null
+          }
+
+          mapfile -t KEYS < <(
+            {
+              extract_keys "${PR_HEAD_REF}"
+              extract_keys "${PR_TITLE}"
+              extract_keys "${PR_BODY}"
+            } | sort -u
+          )
+
+          if [ "${#KEYS[@]}" -eq 0 ]; then
+            echo "No LMLO keys found on PR context."
+            exit 0
+          fi
+
+          for key in "${KEYS[@]}"; do
+            issue_json="$(linear_issue_by_identifier "$key")"
+            issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
+            if [ -z "$issue_id" ]; then
+              echo "Issue ${key} not found in Linear; skipping."
+              continue
+            fi
+            echo "Moving ${key} to In Review."
+            linear_update_state "$issue_id" "${LINEAR_STATE_IN_REVIEW_ID}"
+          done
+
+  push-main-to-done-or-staging:
+    name: Merge to Main -> Done or Staging
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move issues and add merge commit comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+          MERGE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "LINEAR_API_KEY is not set; skipping."
+            exit 0
+          fi
+
+          extract_keys() {
+            local input="$1"
+            if [ -z "$input" ]; then
+              return 0
+            fi
+            printf "%s\n" "$input" \
+              | (grep -oiE 'LMLO-[0-9]+' || true) \
+              | tr '[:lower:]' '[:upper:]' \
+              | sort -u
+          }
+
+          linear_issue_by_identifier() {
+            local identifier="$1"
+            local payload
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload"
+          }
+
+          linear_update_state() {
+            local issue_id="$1"
+            local state_id="$2"
+            local payload
+            payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" >/dev/null
+          }
+
+          linear_comment() {
+            local issue_id="$1"
+            local body="$2"
+            local payload
+            payload="$(jq -n --arg issue_id "$issue_id" --arg body "$body" '{query: "mutation($issue_id: String!, $body: String!) { commentCreate(input: { issueId: $issue_id, body: $body }) { success } }", variables: {issue_id: $issue_id, body: $body}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" >/dev/null
+          }
+
+          is_release_path() {
+            local path="$1"
+            case "$path" in
+              app/*|pyproject.toml|Dockerfile|uv.lock)
+                return 0
+                ;;
+              *)
+                return 1
+                ;;
+            esac
+          }
+
+          PR_NUMBER="$(gh api "repos/${REPO}/commits/${MERGE_SHA}/pulls" --jq '.[0].number' 2>/dev/null || true)"
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "No PR associated with merge commit ${MERGE_SHA}; skipping."
+            exit 0
+          fi
+
+          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          PR_HEAD_REF="$(echo "${PR_JSON}" | jq -r '.head.ref // empty')"
+          PR_TITLE="$(echo "${PR_JSON}" | jq -r '.title // empty')"
+          PR_BODY="$(echo "${PR_JSON}" | jq -r '.body // empty')"
+
+          mapfile -t KEYS < <(
+            {
+              extract_keys "${PR_HEAD_REF}"
+              extract_keys "${PR_TITLE}"
+              extract_keys "${PR_BODY}"
+            } | sort -u
+          )
+
+          if [ "${#KEYS[@]}" -eq 0 ]; then
+            echo "No LMLO keys found in PR #${PR_NUMBER}; skipping."
+            exit 0
+          fi
+
+          RELEASE_TRIGGERED="false"
+          while IFS= read -r file_path; do
+            if is_release_path "$file_path"; then
+              RELEASE_TRIGGERED="true"
+              break
+            fi
+          done < <(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
+
+          TARGET_STATE_ID="${LINEAR_STATE_DONE_ID}"
+          TARGET_STATE_NAME="Done"
+          if [ "${RELEASE_TRIGGERED}" = "true" ]; then
+            TARGET_STATE_ID="${LINEAR_STATE_STAGING_ID}"
+            TARGET_STATE_NAME="Staging"
+          fi
+
+          COMMIT_URL="https://github.com/${REPO}/commit/${MERGE_SHA}"
+          COMMENT_BODY="Merged to \`main\`: ${COMMIT_URL}"
+
+          for key in "${KEYS[@]}"; do
+            issue_json="$(linear_issue_by_identifier "$key")"
+            issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
+            if [ -z "$issue_id" ]; then
+              echo "Issue ${key} not found in Linear; skipping."
+              continue
+            fi
+            echo "Moving ${key} to ${TARGET_STATE_NAME}."
+            linear_update_state "$issue_id" "${TARGET_STATE_ID}"
+            linear_comment "$issue_id" "${COMMENT_BODY}"
+          done
+
+  release-published-to-release:
+    name: Release Published -> Release
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move issues to Release and add release URL comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "LINEAR_API_KEY is not set; skipping."
+            exit 0
+          fi
+
+          extract_keys() {
+            local input="$1"
+            if [ -z "$input" ]; then
+              return 0
+            fi
+            printf "%s\n" "$input" \
+              | (grep -oiE 'LMLO-[0-9]+' || true) \
+              | tr '[:lower:]' '[:upper:]' \
+              | sort -u
+          }
+
+          linear_issue_by_identifier() {
+            local identifier="$1"
+            local payload
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload"
+          }
+
+          linear_update_state() {
+            local issue_id="$1"
+            local state_id="$2"
+            local payload
+            payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" >/dev/null
+          }
+
+          linear_comment() {
+            local issue_id="$1"
+            local body="$2"
+            local payload
+            payload="$(jq -n --arg issue_id "$issue_id" --arg body "$body" '{query: "mutation($issue_id: String!, $body: String!) { commentCreate(input: { issueId: $issue_id, body: $body }) { success } }", variables: {issue_id: $issue_id, body: $body}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" >/dev/null
+          }
+
+          tag_ref_json="$(gh api "repos/${REPO}/git/ref/tags/${RELEASE_TAG}")"
+          tag_object_type="$(echo "${tag_ref_json}" | jq -r '.object.type')"
+          tag_object_sha="$(echo "${tag_ref_json}" | jq -r '.object.sha')"
+
+          if [ "${tag_object_type}" = "tag" ]; then
+            release_commit_sha="$(gh api "repos/${REPO}/git/tags/${tag_object_sha}" --jq '.object.sha')"
+          else
+            release_commit_sha="${tag_object_sha}"
+          fi
+
+          PR_NUMBER="$(gh api "repos/${REPO}/commits/${release_commit_sha}/pulls" --jq '.[0].number' 2>/dev/null || true)"
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "No PR associated with release commit ${release_commit_sha}; skipping."
+            exit 0
+          fi
+
+          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          PR_HEAD_REF="$(echo "${PR_JSON}" | jq -r '.head.ref // empty')"
+          PR_TITLE="$(echo "${PR_JSON}" | jq -r '.title // empty')"
+          PR_BODY="$(echo "${PR_JSON}" | jq -r '.body // empty')"
+
+          mapfile -t KEYS < <(
+            {
+              extract_keys "${PR_HEAD_REF}"
+              extract_keys "${PR_TITLE}"
+              extract_keys "${PR_BODY}"
+            } | sort -u
+          )
+
+          if [ "${#KEYS[@]}" -eq 0 ]; then
+            echo "No LMLO keys found in release-related PR #${PR_NUMBER}; skipping."
+            exit 0
+          fi
+
+          COMMENT_BODY="Released: ${RELEASE_URL}"
+          for key in "${KEYS[@]}"; do
+            issue_json="$(linear_issue_by_identifier "$key")"
+            issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
+            if [ -z "$issue_id" ]; then
+              echo "Issue ${key} not found in Linear; skipping."
+              continue
+            fi
+            echo "Moving ${key} to Release."
+            linear_update_state "$issue_id" "${LINEAR_STATE_RELEASE_ID}"
+            linear_comment "$issue_id" "${COMMENT_BODY}"
+          done
+
+  failed-cicd-to-failed-ci:
+    name: Failed CI/CD -> Failed CI
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move issues to Failed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "LINEAR_API_KEY is not set; skipping."
+            exit 0
+          fi
+
+          extract_keys() {
+            local input="$1"
+            if [ -z "$input" ]; then
+              return 0
+            fi
+            printf "%s\n" "$input" \
+              | (grep -oiE 'LMLO-[0-9]+' || true) \
+              | tr '[:lower:]' '[:upper:]' \
+              | sort -u
+          }
+
+          linear_issue_by_identifier() {
+            local identifier="$1"
+            local payload
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload"
+          }
+
+          linear_update_state() {
+            local issue_id="$1"
+            local state_id="$2"
+            local payload
+            payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload" >/dev/null
+          }
+
+          PR_NUMBER="$(gh api "repos/${REPO}/commits/${HEAD_SHA}/pulls" --jq '.[0].number' 2>/dev/null || true)"
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "No PR associated with failed run commit ${HEAD_SHA}; skipping."
+            exit 0
+          fi
+
+          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          PR_HEAD_REF="$(echo "${PR_JSON}" | jq -r '.head.ref // empty')"
+          PR_TITLE="$(echo "${PR_JSON}" | jq -r '.title // empty')"
+          PR_BODY="$(echo "${PR_JSON}" | jq -r '.body // empty')"
+
+          mapfile -t KEYS < <(
+            {
+              extract_keys "${PR_HEAD_REF}"
+              extract_keys "${PR_TITLE}"
+              extract_keys "${PR_BODY}"
+            } | sort -u
+          )
+
+          if [ "${#KEYS[@]}" -eq 0 ]; then
+            echo "No LMLO keys found in failed-run PR #${PR_NUMBER}; skipping."
+            exit 0
+          fi
+
+          for key in "${KEYS[@]}"; do
+            issue_json="$(linear_issue_by_identifier "$key")"
+            issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
+            if [ -z "$issue_id" ]; then
+              echo "Issue ${key} not found in Linear; skipping."
+              continue
+            fi
+            echo "Moving ${key} to Failed CI."
+            linear_update_state "$issue_id" "${LINEAR_STATE_FAILED_CI_ID}"
+          done
