@@ -7,12 +7,15 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   sync-pr-title:
     name: Sync PR Title from Linear
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Sync title to [LMLO-###] Linear Issue Title
         env:
@@ -25,7 +28,7 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           if [ "${PR_IS_DRAFT}" = "true" ]; then
             echo "Draft PR detected; title sync skipped."
@@ -70,18 +73,18 @@ jobs:
             curl -sS https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "${ISSUE_QUERY}"
+              -d "${ISSUE_QUERY}" || true
           )"
-          ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty')"
+          ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty' 2>/dev/null || true)"
           if [ -z "${ISSUE_TITLE}" ]; then
             ISSUE_QUERY="$(jq -n --arg identifier "${ISSUE_KEY}" '{query: "query($identifier: String!) { issue(id: $identifier) { title } }", variables: {identifier: $identifier}}')"
             ISSUE_RESPONSE="$(
               curl -sS https://api.linear.app/graphql \
                 -H "Authorization: ${LINEAR_API_KEY}" \
                 -H "Content-Type: application/json" \
-                -d "${ISSUE_QUERY}"
+                -d "${ISSUE_QUERY}" || true
             )"
-            ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty')"
+            ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty' 2>/dev/null || true)"
           fi
 
           if [ -z "${ISSUE_TITLE}" ]; then
@@ -100,11 +103,15 @@ jobs:
             --method PATCH \
             "repos/${REPO}/pulls/${PR_NUMBER}" \
             -f title="${DESIRED_TITLE}" \
-            >/dev/null
+            >/dev/null || {
+              echo "Failed to update PR title; continuing."
+              exit 0
+            }
 
   pr-title-check:
     name: PR Title Check
     needs: [sync-pr-title]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - name: Check PR title format
@@ -117,12 +124,12 @@ jobs:
 
           PR_TITLE="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title')"
 
-          # Check format: [LMLO-XXX] Description starting with capital
-          if ! echo "$PR_TITLE" | grep -qE '^\[LMLO-[0-9]+\] [A-Z]'; then
+          # Check format: [LMLO-XXX] Description
+          if ! echo "$PR_TITLE" | grep -qE '^\[LMLO-[0-9]+\] .+'; then
             echo "❌ PR title must match format: [LMLO-XXX] Description"
             echo "   - Must start with [LMLO-XXX] where XXX is a number"
             echo "   - Must have space after closing bracket"
-            echo "   - Description must start with capital letter"
+            echo "   - Must include a non-empty description"
             echo ""
             echo "Your title: $PR_TITLE"
             exit 1

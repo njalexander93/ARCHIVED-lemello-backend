@@ -18,7 +18,6 @@ env:
   LINEAR_STATE_FAILED_CI_ID: ${{ vars.LINEAR_STATE_FAILED_CI_ID }}
   LINEAR_STATE_DONE_ID: ${{ vars.LINEAR_STATE_DONE_ID }}
   LINEAR_STATE_STAGING_ID: ${{ vars.LINEAR_STATE_STAGING_ID }}
-  LINEAR_STATE_IN_REVIEW_ID: ${{ vars.LINEAR_STATE_IN_REVIEW_ID }}
   LINEAR_STATE_IN_PROGRESS_ID: ${{ vars.LINEAR_STATE_IN_PROGRESS_ID }}
   LINEAR_STATE_RELEASE_ID: ${{ vars.LINEAR_STATE_RELEASE_ID }}
 
@@ -38,6 +37,10 @@ jobs:
           if [ -z "${LINEAR_API_KEY:-}" ]; then
             echo "LINEAR_API_KEY is not set; skipping."
             exit 0
+          fi
+          if [ -z "${LINEAR_STATE_IN_PROGRESS_ID:-}" ]; then
+            echo "LINEAR_STATE_IN_PROGRESS_ID is not set."
+            exit 1
           fi
 
           extract_keys() {
@@ -78,12 +81,24 @@ jobs:
           linear_update_state() {
             local issue_id="$1"
             local state_id="$2"
-            local payload
+            local payload response success
+            if [ -z "${state_id:-}" ]; then
+              echo "State ID is empty for issue ${issue_id}."
+              return 1
+            fi
             payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
-            curl -sS https://api.linear.app/graphql \
+            response="$(
+            curl -sS --fail-with-body https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "$payload" >/dev/null
+              -d "$payload"
+            )"
+            success="$(echo "$response" | jq -r '.data.issueUpdate.success // "false"')"
+            if [ "$success" != "true" ]; then
+              echo "Linear issueUpdate failed for ${issue_id}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
           }
 
           mapfile -t KEYS < <(extract_keys "${BRANCH_NAME}" || true)
@@ -131,6 +146,10 @@ jobs:
             echo "LINEAR_API_KEY is not set; skipping."
             exit 0
           fi
+          if [ -z "${LINEAR_STATE_DONE_ID:-}" ] || [ -z "${LINEAR_STATE_STAGING_ID:-}" ]; then
+            echo "LINEAR_STATE_DONE_ID and/or LINEAR_STATE_STAGING_ID is not set."
+            exit 1
+          fi
 
           extract_keys() {
             local input="$1"
@@ -173,23 +192,43 @@ jobs:
           linear_update_state() {
             local issue_id="$1"
             local state_id="$2"
-            local payload
+            local payload response success
+            if [ -z "${state_id:-}" ]; then
+              echo "State ID is empty for issue ${issue_id}."
+              return 1
+            fi
             payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
-            curl -sS https://api.linear.app/graphql \
+            response="$(
+            curl -sS --fail-with-body https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "$payload" >/dev/null
+              -d "$payload"
+            )"
+            success="$(echo "$response" | jq -r '.data.issueUpdate.success // "false"')"
+            if [ "$success" != "true" ]; then
+              echo "Linear issueUpdate failed for ${issue_id}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
           }
 
           linear_comment() {
             local issue_id="$1"
             local body="$2"
-            local payload
+            local payload response success
             payload="$(jq -n --arg issue_id "$issue_id" --arg body "$body" '{query: "mutation($issue_id: String!, $body: String!) { commentCreate(input: { issueId: $issue_id, body: $body }) { success } }", variables: {issue_id: $issue_id, body: $body}}')"
-            curl -sS https://api.linear.app/graphql \
+            response="$(
+            curl -sS --fail-with-body https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "$payload" >/dev/null
+              -d "$payload"
+            )"
+            success="$(echo "$response" | jq -r '.data.commentCreate.success // "false"')"
+            if [ "$success" != "true" ]; then
+              echo "Linear commentCreate failed for ${issue_id}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
           }
 
           is_release_path() {
@@ -277,6 +316,10 @@ jobs:
             echo "LINEAR_API_KEY is not set; skipping."
             exit 0
           fi
+          if [ -z "${LINEAR_STATE_RELEASE_ID:-}" ]; then
+            echo "LINEAR_STATE_RELEASE_ID is not set."
+            exit 1
+          fi
 
           extract_keys() {
             local input="$1"
@@ -319,23 +362,43 @@ jobs:
           linear_update_state() {
             local issue_id="$1"
             local state_id="$2"
-            local payload
+            local payload response success
+            if [ -z "${state_id:-}" ]; then
+              echo "State ID is empty for issue ${issue_id}."
+              return 1
+            fi
             payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
-            curl -sS https://api.linear.app/graphql \
+            response="$(
+            curl -sS --fail-with-body https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "$payload" >/dev/null
+              -d "$payload"
+            )"
+            success="$(echo "$response" | jq -r '.data.issueUpdate.success // "false"')"
+            if [ "$success" != "true" ]; then
+              echo "Linear issueUpdate failed for ${issue_id}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
           }
 
           linear_comment() {
             local issue_id="$1"
             local body="$2"
-            local payload
+            local payload response success
             payload="$(jq -n --arg issue_id "$issue_id" --arg body "$body" '{query: "mutation($issue_id: String!, $body: String!) { commentCreate(input: { issueId: $issue_id, body: $body }) { success } }", variables: {issue_id: $issue_id, body: $body}}')"
-            curl -sS https://api.linear.app/graphql \
+            response="$(
+            curl -sS --fail-with-body https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "$payload" >/dev/null
+              -d "$payload"
+            )"
+            success="$(echo "$response" | jq -r '.data.commentCreate.success // "false"')"
+            if [ "$success" != "true" ]; then
+              echo "Linear commentCreate failed for ${issue_id}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
           }
 
           tag_ref_json="$(gh api "repos/${REPO}/git/ref/tags/${RELEASE_TAG}")"
@@ -403,6 +466,10 @@ jobs:
             echo "LINEAR_API_KEY is not set; skipping."
             exit 0
           fi
+          if [ -z "${LINEAR_STATE_FAILED_CI_ID:-}" ]; then
+            echo "LINEAR_STATE_FAILED_CI_ID is not set."
+            exit 1
+          fi
 
           extract_keys() {
             local input="$1"
@@ -445,12 +512,24 @@ jobs:
           linear_update_state() {
             local issue_id="$1"
             local state_id="$2"
-            local payload
+            local payload response success
+            if [ -z "${state_id:-}" ]; then
+              echo "State ID is empty for issue ${issue_id}."
+              return 1
+            fi
             payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
-            curl -sS https://api.linear.app/graphql \
+            response="$(
+            curl -sS --fail-with-body https://api.linear.app/graphql \
               -H "Authorization: ${LINEAR_API_KEY}" \
               -H "Content-Type: application/json" \
-              -d "$payload" >/dev/null
+              -d "$payload"
+            )"
+            success="$(echo "$response" | jq -r '.data.issueUpdate.success // "false"')"
+            if [ "$success" != "true" ]; then
+              echo "Linear issueUpdate failed for ${issue_id}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
           }
 
           PR_NUMBER="$(gh api "repos/${REPO}/commits/${HEAD_SHA}/pulls" --jq '.[0].number' 2>/dev/null || true)"
