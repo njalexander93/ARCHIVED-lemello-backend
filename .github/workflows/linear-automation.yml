@@ -53,28 +53,30 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload response issue_id
+            local payload response issue_id error_count
 
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id identifier state { id name } } }", variables: {identifier: $identifier}}')"
             response="$(
-              curl -sS https://api.linear.app/graphql \
+              curl -sS --fail-with-body https://api.linear.app/graphql \
                 -H "Authorization: ${LINEAR_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -d "$payload"
             )"
+            if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              return 1
+            fi
+            error_count="$(echo "$response" | jq -r '.errors | length // 0')"
+            if [ "${error_count}" != "0" ]; then
+              echo "Linear lookup failed for ${identifier}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
             if [ -n "$issue_id" ]; then
               echo "$response"
               return 0
             fi
-
-            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id identifier state { id name } } }", variables: {identifier: $identifier}}')"
-            response="$(
-              curl -sS https://api.linear.app/graphql \
-                -H "Authorization: ${LINEAR_API_KEY}" \
-                -H "Content-Type: application/json" \
-                -d "$payload"
-            )"
             echo "$response"
           }
 
@@ -164,28 +166,30 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload response issue_id
+            local payload response issue_id error_count
 
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
             response="$(
-              curl -sS https://api.linear.app/graphql \
+              curl -sS --fail-with-body https://api.linear.app/graphql \
                 -H "Authorization: ${LINEAR_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -d "$payload"
             )"
+            if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              return 1
+            fi
+            error_count="$(echo "$response" | jq -r '.errors | length // 0')"
+            if [ "${error_count}" != "0" ]; then
+              echo "Linear lookup failed for ${identifier}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
             if [ -n "$issue_id" ]; then
               echo "$response"
               return 0
             fi
-
-            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id } }", variables: {identifier: $identifier}}')"
-            response="$(
-              curl -sS https://api.linear.app/graphql \
-                -H "Authorization: ${LINEAR_API_KEY}" \
-                -H "Content-Type: application/json" \
-                -d "$payload"
-            )"
             echo "$response"
           }
 
@@ -334,28 +338,30 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload response issue_id
+            local payload response issue_id error_count
 
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
             response="$(
-              curl -sS https://api.linear.app/graphql \
+              curl -sS --fail-with-body https://api.linear.app/graphql \
                 -H "Authorization: ${LINEAR_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -d "$payload"
             )"
+            if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              return 1
+            fi
+            error_count="$(echo "$response" | jq -r '.errors | length // 0')"
+            if [ "${error_count}" != "0" ]; then
+              echo "Linear lookup failed for ${identifier}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
             if [ -n "$issue_id" ]; then
               echo "$response"
               return 0
             fi
-
-            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id } }", variables: {identifier: $identifier}}')"
-            response="$(
-              curl -sS https://api.linear.app/graphql \
-                -H "Authorization: ${LINEAR_API_KEY}" \
-                -H "Content-Type: application/json" \
-                -d "$payload"
-            )"
             echo "$response"
           }
 
@@ -484,28 +490,30 @@ jobs:
 
           linear_issue_by_identifier() {
             local identifier="$1"
-            local payload response issue_id
+            local payload response issue_id error_count
 
             payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
             response="$(
-              curl -sS https://api.linear.app/graphql \
+              curl -sS --fail-with-body https://api.linear.app/graphql \
                 -H "Authorization: ${LINEAR_API_KEY}" \
                 -H "Content-Type: application/json" \
                 -d "$payload"
             )"
+            if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              return 1
+            fi
+            error_count="$(echo "$response" | jq -r '.errors | length // 0')"
+            if [ "${error_count}" != "0" ]; then
+              echo "Linear lookup failed for ${identifier}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
             if [ -n "$issue_id" ]; then
               echo "$response"
               return 0
             fi
-
-            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(id: $identifier) { id } }", variables: {identifier: $identifier}}')"
-            response="$(
-              curl -sS https://api.linear.app/graphql \
-                -H "Authorization: ${LINEAR_API_KEY}" \
-                -H "Content-Type: application/json" \
-                -d "$payload"
-            )"
             echo "$response"
           }
 
