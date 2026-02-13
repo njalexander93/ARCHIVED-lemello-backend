@@ -114,7 +114,7 @@ jobs:
   pr-title-check:
     name: PR Title Check
     needs: [sync-pr-title]
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Check PR title format
@@ -128,7 +128,7 @@ jobs:
           PR_TITLE="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title')"
 
           # Check format: [LMLO-XXX] Description
-          if ! echo "$PR_TITLE" | grep -qE '^\[LMLO-[0-9]+\] .+'; then
+          if ! echo "$PR_TITLE" | grep -qE '^\[LMLO-[0-9]+\] .*[^[:space:]].*$'; then
             echo "❌ PR title must match format: [LMLO-XXX] Description"
             echo "   - Must start with [LMLO-XXX] where XXX is a number"
             echo "   - Must have space after closing bracket"

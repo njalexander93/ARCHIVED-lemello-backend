@@ -14,11 +14,11 @@ env:
 
 jobs:
   pr-ready-to-in-review:
-    name: PR Ready -> In Review
+    name: PR Non-Draft -> In Review
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
-      - name: Move referenced issues to In Review
+      - name: Move referenced issues to In Review (non-draft PR)
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
