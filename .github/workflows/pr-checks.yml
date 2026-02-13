@@ -3,27 +3,136 @@ name: PR Checks
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
+  sync-pr-title:
+    name: Sync PR Title from Linear
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Sync title to [LMLO-###] Linear Issue Title
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          # Intentionally omit -e: this is best-effort and exits 0 on recoverable failures.
+          set -uo pipefail
+
+          if [ "${PR_IS_DRAFT}" = "true" ]; then
+            echo "Draft PR detected; title sync skipped."
+            exit 0
+          fi
+
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "LINEAR_API_KEY is not set; title sync skipped."
+            exit 0
+          fi
+
+          extract_keys() {
+            local input="$1"
+            if [ -z "$input" ]; then
+              return 0
+            fi
+            printf "%s\n" "$input" \
+              | (grep -oiE 'LMLO-[0-9]+' || true) \
+              | tr '[:lower:]' '[:upper:]' \
+              | awk '!seen[$0]++'
+          }
+
+          KEY_FROM_BRANCH="$(extract_keys "${PR_HEAD_REF}" | head -n1 || true)"
+          if [ -n "${KEY_FROM_BRANCH}" ]; then
+            ISSUE_KEY="${KEY_FROM_BRANCH}"
+          else
+            ISSUE_KEY="$(
+              {
+                extract_keys "${PR_TITLE}"
+                extract_keys "${PR_BODY}"
+              } | head -n1 || true
+            )"
+          fi
+
+          if [ -z "${ISSUE_KEY}" ]; then
+            echo "No LMLO issue key found; title sync skipped."
+            exit 0
+          fi
+
+          ISSUE_QUERY="$(jq -n --arg identifier "${ISSUE_KEY}" '{query: "query($identifier: String!) { issue(identifier: $identifier) { title } }", variables: {identifier: $identifier}}')"
+          ISSUE_RESPONSE="$(
+            curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "${ISSUE_QUERY}" || true
+          )"
+
+          if ! echo "${ISSUE_RESPONSE}" | jq -e . >/dev/null 2>&1; then
+            echo "Received invalid JSON from Linear; title sync skipped."
+            exit 0
+          fi
+          if echo "${ISSUE_RESPONSE}" | jq -e '.errors and (.errors | length > 0)' >/dev/null 2>&1; then
+            echo "Linear GraphQL error while fetching ${ISSUE_KEY}:"
+            echo "${ISSUE_RESPONSE}" | jq -r '.errors[]?.message // empty' 2>/dev/null || true
+            echo "Title sync skipped due to Linear error."
+            exit 0
+          fi
+
+          ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty' 2>/dev/null || true)"
+
+          if [ -z "${ISSUE_TITLE}" ]; then
+            echo "Could not resolve Linear issue title for ${ISSUE_KEY}; title sync skipped."
+            exit 0
+          fi
+
+          DESIRED_TITLE="[${ISSUE_KEY}] ${ISSUE_TITLE}"
+          if [ "${PR_TITLE}" = "${DESIRED_TITLE}" ]; then
+            echo "PR title already matches desired format."
+            exit 0
+          fi
+
+          echo "Updating PR title to: ${DESIRED_TITLE}"
+          gh api \
+            --method PATCH \
+            "repos/${REPO}/pulls/${PR_NUMBER}" \
+            -f title="${DESIRED_TITLE}" \
+            >/dev/null || {
+              echo "Failed to update PR title; continuing."
+              exit 0
+            }
+
   pr-title-check:
     name: PR Title Check
+    needs: [sync-pr-title]
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Check PR title format
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          # Check format: [LMLO-XXX] Description starting with capital
-          if ! echo "$PR_TITLE" | grep -qE '^\[LMLO-[0-9]+\] [A-Z]'; then
+          set -euo pipefail
+
+          PR_TITLE="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.title')"
+
+          # Check format: [LMLO-XXX] Description
+          if ! echo "$PR_TITLE" | grep -qE '^\[LMLO-[0-9]+\] .*[^[:space:]].*$'; then
             echo "❌ PR title must match format: [LMLO-XXX] Description"
             echo "   - Must start with [LMLO-XXX] where XXX is a number"
             echo "   - Must have space after closing bracket"
-            echo "   - Description must start with capital letter"
+            echo "   - Must include a non-empty description"
             echo ""
             echo "Your title: $PR_TITLE"
             exit 1

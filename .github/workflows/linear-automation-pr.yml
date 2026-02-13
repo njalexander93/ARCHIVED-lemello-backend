@@ -1,0 +1,125 @@
+name: Linear Automation / PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  LINEAR_STATE_IN_REVIEW_ID: ${{ vars.LINEAR_STATE_IN_REVIEW_ID }}
+
+jobs:
+  pr-ready-to-in-review:
+    name: PR Non-Draft -> In Review
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Move referenced issues to In Review (non-draft PR)
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "LINEAR_API_KEY is not set; skipping."
+            exit 0
+          fi
+          if [ -z "${LINEAR_STATE_IN_REVIEW_ID:-}" ]; then
+            echo "LINEAR_STATE_IN_REVIEW_ID is not set."
+            exit 1
+          fi
+
+          extract_keys() {
+            local input="$1"
+            if [ -z "$input" ]; then
+              return 0
+            fi
+            printf "%s\n" "$input" \
+              | (grep -oiE 'LMLO-[0-9]+' || true) \
+              | tr '[:lower:]' '[:upper:]' \
+              | sort -u
+          }
+
+          linear_issue_by_identifier() {
+            local identifier="$1"
+            local payload response issue_id error_count
+
+            payload="$(jq -n --arg identifier "$identifier" '{query: "query($identifier: String!) { issue(identifier: $identifier) { id } }", variables: {identifier: $identifier}}')"
+            response="$(
+              curl -sS --fail-with-body https://api.linear.app/graphql \
+                -H "Authorization: ${LINEAR_API_KEY}" \
+                -H "Content-Type: application/json" \
+                -d "$payload"
+            )"
+            if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}" >&2
+              return 1
+            fi
+            error_count="$(echo "$response" | jq -r '.errors | length // 0')"
+            if [ "${error_count}" != "0" ]; then
+              echo "Linear lookup failed for ${identifier}." >&2
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
+              return 1
+            fi
+            issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
+            if [ -n "$issue_id" ]; then
+              echo "$response"
+              return 0
+            fi
+            echo "$response"
+          }
+
+          linear_update_state() {
+            local issue_id="$1"
+            local state_id="$2"
+            local payload response success
+            if [ -z "${state_id:-}" ]; then
+              echo "State ID is empty for issue ${issue_id}."
+              return 1
+            fi
+            payload="$(jq -n --arg issue_id "$issue_id" --arg state_id "$state_id" '{query: "mutation($issue_id: String!, $state_id: String!) { issueUpdate(id: $issue_id, input: { stateId: $state_id }) { success } }", variables: {issue_id: $issue_id, state_id: $state_id}}')"
+            response="$(
+            curl -sS --fail-with-body https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "$payload"
+            )"
+            success="$(echo "$response" | jq -r '.data.issueUpdate.success // "false"')"
+            if [ "$success" != "true" ]; then
+              echo "Linear issueUpdate failed for ${issue_id}."
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              return 1
+            fi
+          }
+
+          mapfile -t KEYS < <(
+            {
+              extract_keys "${PR_HEAD_REF}"
+              extract_keys "${PR_TITLE}"
+              extract_keys "${PR_BODY}"
+            } | sort -u
+          )
+
+          if [ "${#KEYS[@]}" -eq 0 ]; then
+            echo "No LMLO keys found on PR context."
+            exit 0
+          fi
+
+          for key in "${KEYS[@]}"; do
+            issue_json="$(linear_issue_by_identifier "$key")"
+            issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
+            if [ -z "$issue_id" ]; then
+              echo "Issue ${key} not found in Linear; skipping."
+              continue
+            fi
+            echo "Moving ${key} to In Review."
+            # Intentionally fail-fast if state mutation fails.
+            linear_update_state "$issue_id" "${LINEAR_STATE_IN_REVIEW_ID}"
+          done
