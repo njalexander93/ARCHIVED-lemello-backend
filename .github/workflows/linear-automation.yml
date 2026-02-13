@@ -239,8 +239,11 @@ jobs:
           is_release_path() {
             local path="$1"
             # Matches build-and-release "release_paths" in release.yml.
+            if [[ "$path" =~ ^app/ ]]; then
+              return 0
+            fi
             case "$path" in
-              app/*|pyproject.toml|Dockerfile|uv.lock)
+              pyproject.toml|Dockerfile|uv.lock)
                 return 0
                 ;;
               *)
@@ -249,7 +252,7 @@ jobs:
             esac
           }
 
-          PR_NUMBER="$(gh api "repos/${REPO}/commits/${MERGE_SHA}/pulls" --jq '.[0].number' 2>/dev/null || true)"
+          PR_NUMBER="$(gh api "repos/${REPO}/commits/${MERGE_SHA}/pulls" --jq '.[0].number // empty' 2>/dev/null || true)"
           if [ -z "${PR_NUMBER}" ]; then
             echo "No PR associated with merge commit ${MERGE_SHA}; skipping."
             exit 0
@@ -277,19 +280,17 @@ jobs:
           fi
 
           RELEASE_TRIGGERED="false"
-          PR_FILES_CMD_STATUS=0
-          mapfile -t PR_FILES < <(
-            gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename'
-          ) || PR_FILES_CMD_STATUS=$?
-          if [ "${PR_FILES_CMD_STATUS}" -ne 0 ]; then
+          PR_FILES_RAW="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename' 2>/dev/null)" || {
             echo "Warning: Failed to fetch files for PR #${PR_NUMBER}; defaulting to Done."
-          else
-            for file_path in "${PR_FILES[@]}"; do
+            PR_FILES_RAW=""
+          }
+          if [ -n "${PR_FILES_RAW}" ]; then
+            while IFS= read -r file_path; do
               if is_release_path "$file_path"; then
                 RELEASE_TRIGGERED="true"
                 break
               fi
-            done
+            done <<< "${PR_FILES_RAW}"
           fi
 
           TARGET_STATE_ID="${LINEAR_STATE_DONE_ID}"
@@ -437,7 +438,7 @@ jobs:
             release_commit_sha="${tag_object_sha}"
           fi
 
-          PR_NUMBER="$(gh api "repos/${REPO}/commits/${release_commit_sha}/pulls" --jq '.[0].number' 2>/dev/null || true)"
+          PR_NUMBER="$(gh api "repos/${REPO}/commits/${release_commit_sha}/pulls" --jq '.[0].number // empty' 2>/dev/null || true)"
           if [ -z "${PR_NUMBER}" ]; then
             echo "No PR associated with release commit ${release_commit_sha}; skipping."
             exit 0
@@ -564,7 +565,7 @@ jobs:
             fi
           }
 
-          PR_NUMBER="$(gh api "repos/${REPO}/commits/${HEAD_SHA}/pulls" --jq '.[0].number' 2>/dev/null || true)"
+          PR_NUMBER="$(gh api "repos/${REPO}/commits/${HEAD_SHA}/pulls" --jq '.[0].number // empty' 2>/dev/null || true)"
           if [ -z "${PR_NUMBER}" ]; then
             echo "No PR associated with failed run commit ${HEAD_SHA}; skipping."
             exit 0
