@@ -117,7 +117,6 @@ jobs:
             issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
             if [ -z "$issue_id" ]; then
               echo "Issue ${key} not found in Linear; skipping."
-              echo "$issue_json" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
               continue
             fi
             echo "Moving ${key} to In Review."
