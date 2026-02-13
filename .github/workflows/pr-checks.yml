@@ -28,6 +28,7 @@ jobs:
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
           PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
+          # Intentionally omit -e: this is best-effort and exits 0 on recoverable failures.
           set -uo pipefail
 
           if [ "${PR_IS_DRAFT}" = "true" ]; then
@@ -75,6 +76,18 @@ jobs:
               -H "Content-Type: application/json" \
               -d "${ISSUE_QUERY}" || true
           )"
+
+          if ! echo "${ISSUE_RESPONSE}" | jq -e . >/dev/null 2>&1; then
+            echo "Received invalid JSON from Linear; title sync skipped."
+            exit 0
+          fi
+          if echo "${ISSUE_RESPONSE}" | jq -e '.errors and (.errors | length > 0)' >/dev/null 2>&1; then
+            echo "Linear GraphQL error while fetching ${ISSUE_KEY}:"
+            echo "${ISSUE_RESPONSE}" | jq -r '.errors[]?.message // empty' 2>/dev/null || true
+            echo "Title sync skipped due to Linear error."
+            exit 0
+          fi
+
           ISSUE_TITLE="$(echo "${ISSUE_RESPONSE}" | jq -r '.data.issue.title // empty' 2>/dev/null || true)"
 
           if [ -z "${ISSUE_TITLE}" ]; then

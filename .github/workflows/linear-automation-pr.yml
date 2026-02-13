@@ -59,13 +59,13 @@ jobs:
                 -d "$payload"
             )"
             if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}" >&2
               return 1
             fi
             error_count="$(echo "$response" | jq -r '.errors | length // 0')"
             if [ "${error_count}" != "0" ]; then
-              echo "Linear lookup failed for ${identifier}."
-              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              echo "Linear lookup failed for ${identifier}." >&2
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
               return 1
             fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
@@ -117,9 +117,10 @@ jobs:
             issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
             if [ -z "$issue_id" ]; then
               echo "Issue ${key} not found in Linear; skipping."
-              echo "$issue_json" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              echo "$issue_json" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
               continue
             fi
             echo "Moving ${key} to In Review."
+            # Intentionally fail-fast if state mutation fails.
             linear_update_state "$issue_id" "${LINEAR_STATE_IN_REVIEW_ID}"
           done

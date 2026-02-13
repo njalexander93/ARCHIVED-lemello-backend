@@ -63,13 +63,13 @@ jobs:
                 -d "$payload"
             )"
             if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}" >&2
               return 1
             fi
             error_count="$(echo "$response" | jq -r '.errors | length // 0')"
             if [ "${error_count}" != "0" ]; then
-              echo "Linear lookup failed for ${identifier}."
-              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              echo "Linear lookup failed for ${identifier}." >&2
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
               return 1
             fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
@@ -122,6 +122,7 @@ jobs:
             case "$current_state_name" in
               "Backlog"|"Planned"|"Failed CI")
                 echo "Moving ${key} to In Progress."
+                # Intentionally fail-fast if state mutation fails.
                 linear_update_state "$issue_id" "${LINEAR_STATE_IN_PROGRESS_ID}"
                 ;;
               *)
@@ -176,13 +177,13 @@ jobs:
                 -d "$payload"
             )"
             if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}" >&2
               return 1
             fi
             error_count="$(echo "$response" | jq -r '.errors | length // 0')"
             if [ "${error_count}" != "0" ]; then
-              echo "Linear lookup failed for ${identifier}."
-              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              echo "Linear lookup failed for ${identifier}." >&2
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
               return 1
             fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
@@ -237,6 +238,7 @@ jobs:
 
           is_release_path() {
             local path="$1"
+            # Matches build-and-release "release_paths" in release.yml.
             case "$path" in
               app/*|pyproject.toml|Dockerfile|uv.lock)
                 return 0
@@ -253,7 +255,10 @@ jobs:
             exit 0
           fi
 
-          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" 2>/dev/null)" || {
+            echo "Failed to fetch PR details for #${PR_NUMBER}; skipping."
+            exit 0
+          }
           PR_HEAD_REF="$(echo "${PR_JSON}" | jq -r '.head.ref // empty')"
           PR_TITLE="$(echo "${PR_JSON}" | jq -r '.title // empty')"
           PR_BODY="$(echo "${PR_JSON}" | jq -r '.body // empty')"
@@ -272,12 +277,20 @@ jobs:
           fi
 
           RELEASE_TRIGGERED="false"
-          while IFS= read -r file_path; do
-            if is_release_path "$file_path"; then
-              RELEASE_TRIGGERED="true"
-              break
-            fi
-          done < <(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')
+          PR_FILES_CMD_STATUS=0
+          mapfile -t PR_FILES < <(
+            gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename'
+          ) || PR_FILES_CMD_STATUS=$?
+          if [ "${PR_FILES_CMD_STATUS}" -ne 0 ]; then
+            echo "Warning: Failed to fetch files for PR #${PR_NUMBER}; defaulting to Done."
+          else
+            for file_path in "${PR_FILES[@]}"; do
+              if is_release_path "$file_path"; then
+                RELEASE_TRIGGERED="true"
+                break
+              fi
+            done
+          fi
 
           TARGET_STATE_ID="${LINEAR_STATE_DONE_ID}"
           TARGET_STATE_NAME="Done"
@@ -290,6 +303,7 @@ jobs:
           COMMENT_BODY="Merged to \`main\`: ${COMMIT_URL}"
 
           for key in "${KEYS[@]}"; do
+            # Intentionally fail-fast if state/comment mutations fail.
             issue_json="$(linear_issue_by_identifier "$key")"
             issue_id="$(echo "$issue_json" | jq -r '.data.issue.id // empty')"
             if [ -z "$issue_id" ]; then
@@ -348,13 +362,13 @@ jobs:
                 -d "$payload"
             )"
             if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}" >&2
               return 1
             fi
             error_count="$(echo "$response" | jq -r '.errors | length // 0')"
             if [ "${error_count}" != "0" ]; then
-              echo "Linear lookup failed for ${identifier}."
-              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              echo "Linear lookup failed for ${identifier}." >&2
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
               return 1
             fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
@@ -407,12 +421,18 @@ jobs:
             fi
           }
 
-          tag_ref_json="$(gh api "repos/${REPO}/git/ref/tags/${RELEASE_TAG}")"
+          tag_ref_json="$(gh api "repos/${REPO}/git/ref/tags/${RELEASE_TAG}" 2>/dev/null)" || {
+            echo "Failed to fetch tag ref for ${RELEASE_TAG}; skipping."
+            exit 0
+          }
           tag_object_type="$(echo "${tag_ref_json}" | jq -r '.object.type')"
           tag_object_sha="$(echo "${tag_ref_json}" | jq -r '.object.sha')"
 
           if [ "${tag_object_type}" = "tag" ]; then
-            release_commit_sha="$(gh api "repos/${REPO}/git/tags/${tag_object_sha}" --jq '.object.sha')"
+            release_commit_sha="$(gh api "repos/${REPO}/git/tags/${tag_object_sha}" --jq '.object.sha' 2>/dev/null)" || {
+              echo "Failed to resolve annotated tag ${RELEASE_TAG}; skipping."
+              exit 0
+            }
           else
             release_commit_sha="${tag_object_sha}"
           fi
@@ -423,7 +443,10 @@ jobs:
             exit 0
           fi
 
-          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" 2>/dev/null)" || {
+            echo "Failed to fetch PR details for #${PR_NUMBER}; skipping."
+            exit 0
+          }
           PR_HEAD_REF="$(echo "${PR_JSON}" | jq -r '.head.ref // empty')"
           PR_TITLE="$(echo "${PR_JSON}" | jq -r '.title // empty')"
           PR_BODY="$(echo "${PR_JSON}" | jq -r '.body // empty')"
@@ -450,6 +473,7 @@ jobs:
               continue
             fi
             echo "Moving ${key} to Release."
+            # Intentionally fail-fast if state/comment mutations fail.
             linear_update_state "$issue_id" "${LINEAR_STATE_RELEASE_ID}"
             linear_comment "$issue_id" "${COMMENT_BODY}"
           done
@@ -500,13 +524,13 @@ jobs:
                 -d "$payload"
             )"
             if ! echo "$response" | jq -e . >/dev/null 2>&1; then
-              echo "Linear returned invalid JSON for issue lookup: ${identifier}"
+              echo "Linear returned invalid JSON for issue lookup: ${identifier}" >&2
               return 1
             fi
             error_count="$(echo "$response" | jq -r '.errors | length // 0')"
             if [ "${error_count}" != "0" ]; then
-              echo "Linear lookup failed for ${identifier}."
-              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' || true
+              echo "Linear lookup failed for ${identifier}." >&2
+              echo "$response" | jq -r '.errors[]?.message' | sed 's/^/Linear error: /' >&2 || true
               return 1
             fi
             issue_id="$(echo "$response" | jq -r '.data.issue.id // empty')"
@@ -546,7 +570,10 @@ jobs:
             exit 0
           fi
 
-          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}")"
+          PR_JSON="$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" 2>/dev/null)" || {
+            echo "Failed to fetch PR details for #${PR_NUMBER}; skipping."
+            exit 0
+          }
           PR_HEAD_REF="$(echo "${PR_JSON}" | jq -r '.head.ref // empty')"
           PR_TITLE="$(echo "${PR_JSON}" | jq -r '.title // empty')"
           PR_BODY="$(echo "${PR_JSON}" | jq -r '.body // empty')"
@@ -572,5 +599,6 @@ jobs:
               continue
             fi
             echo "Moving ${key} to Failed CI."
+            # Intentionally fail-fast if state mutation fails.
             linear_update_state "$issue_id" "${LINEAR_STATE_FAILED_CI_ID}"
           done
