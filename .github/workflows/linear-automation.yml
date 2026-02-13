@@ -6,6 +6,8 @@ on:
     branches: [main]
   release:
     types: [published]
+  repository_dispatch:
+    types: [release_published]
   workflow_run:
     workflows: ["CI/CD"]
     types: [completed]
@@ -318,7 +320,9 @@ jobs:
 
   release-published-to-release:
     name: Release Published -> Release
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: |
+      (github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'repository_dispatch' && github.event.action == 'release_published')
     runs-on: ubuntu-latest
     steps:
       - name: Move issues to Release and add release URL comment
@@ -326,8 +330,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
-          RELEASE_URL: ${{ github.event.release.html_url }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG_FROM_RELEASE: ${{ github.event.release.tag_name }}
+          RELEASE_URL_FROM_RELEASE: ${{ github.event.release.html_url }}
+          RELEASE_TAG_FROM_DISPATCH: ${{ github.event.client_payload.tag_name }}
+          RELEASE_URL_FROM_DISPATCH: ${{ github.event.client_payload.release_url }}
         run: |
           set -euo pipefail
 
@@ -338,6 +345,17 @@ jobs:
           if [ -z "${LINEAR_STATE_RELEASE_ID:-}" ]; then
             echo "LINEAR_STATE_RELEASE_ID is not set."
             exit 1
+          fi
+
+          RELEASE_TAG="${RELEASE_TAG_FROM_RELEASE:-}"
+          RELEASE_URL="${RELEASE_URL_FROM_RELEASE:-}"
+          if [ "${EVENT_NAME}" = "repository_dispatch" ]; then
+            RELEASE_TAG="${RELEASE_TAG_FROM_DISPATCH:-}"
+            RELEASE_URL="${RELEASE_URL_FROM_DISPATCH:-}"
+          fi
+          if [ -z "${RELEASE_TAG}" ] || [ -z "${RELEASE_URL}" ]; then
+            echo "Release tag/url payload missing; skipping."
+            exit 0
           fi
 
           extract_keys() {

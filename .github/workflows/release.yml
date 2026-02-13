@@ -132,6 +132,22 @@ jobs:
             See commit history for details." \
             --repo ${{ github.repository }}
 
+      - name: Notify Linear automation of published release
+        if: steps.filter.outputs.release_paths == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: v${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          RELEASE_URL="https://github.com/${REPO}/releases/tag/${RELEASE_TAG}"
+          gh api "repos/${REPO}/dispatches" \
+            --method POST \
+            -f event_type='release_published' \
+            -f "client_payload[tag_name]=${RELEASE_TAG}" \
+            -f "client_payload[release_url]=${RELEASE_URL}" \
+            >/dev/null
+
       - name: Skip deployment for test-only changes
         if: steps.filter.outputs.release_paths == 'false'
         run: echo "✅ No release-path changes detected; deployment skipped."
