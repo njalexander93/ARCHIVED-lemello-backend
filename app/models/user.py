@@ -78,7 +78,7 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     # Authentication
     hashed_password: Mapped[str | None] = mapped_column(
-        String(128),
+        String(255),
         nullable=True,
     )
     password_changed_at: Mapped[datetime | None] = mapped_column(
@@ -141,8 +141,4 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         """Return string representation of User."""
-        return (
-            f"<User(id={self.id!r}, "
-            f"username={self.username!r}, "
-            f"email={self.email!r})>"
-        )
+        return f"<User(id={self.id!r}, username={self.username!r})>"
