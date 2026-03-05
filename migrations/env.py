@@ -21,7 +21,9 @@ from app.core.database import Base
 #
 # Example:
 #   from app.models.recipe import Recipe  # noqa: F401
+#   from app.models.user import User  # noqa: F401
 # -------------------------------------------------------------------
+from app.models.user import User  # noqa: F401
 
 # Alembic Config object (provides access to alembic.ini values)
 config = context.config
