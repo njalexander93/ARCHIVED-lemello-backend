@@ -7,20 +7,27 @@ migration: if a user logs in with a bcrypt hash, it is
 automatically re-hashed to Argon2id.
 """
 
+from typing import Any
+
 from pwdlib import PasswordHash
+from pwdlib.exceptions import HasherNotAvailable
 from pwdlib.hashers.argon2 import Argon2Hasher
-from pwdlib.hashers.bcrypt import BcryptHasher
+
+try:
+    from pwdlib.hashers.bcrypt import BcryptHasher as _BcryptHasher
+except HasherNotAvailable:
+    BcryptHasherType: type[_BcryptHasher] | None = None
+else:
+    BcryptHasherType = _BcryptHasher
 
 # Argon2id with RFC 9106 LOW_MEMORY profile:
 # 64 MiB memory, 3 iterations, 4 parallelism threads.
 # Suitable for 1 GB RAM DigitalOcean App Platform containers.
 # Each concurrent hash operation uses ~64 MiB.
-_password_hash = PasswordHash(
-    (
-        Argon2Hasher(),
-        BcryptHasher(),
-    )
-)
+hashers: list[Any] = [Argon2Hasher()]
+if BcryptHasherType is not None:
+    hashers.append(BcryptHasherType())
+_password_hash = PasswordHash(tuple(hashers))
 
 
 def hash_password(password: str) -> str:

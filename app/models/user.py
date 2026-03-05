@@ -104,7 +104,7 @@ class User(UUIDMixin, TimestampMixin, Base):
     # AI personalization
     preferences: Mapped[dict[str, Any]] = mapped_column(
         MutableDict.as_mutable(JSON().with_variant(JSONB, "postgresql")),
-        server_default=text("'{}'::jsonb"),
+        server_default=text("'{}'"),
         default=dict,
     )
 
