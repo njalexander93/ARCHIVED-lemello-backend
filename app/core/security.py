@@ -21,10 +21,9 @@ except HasherNotAvailable:
 else:
     BcryptHasherType = _BcryptHasher
 
-# Argon2id with RFC 9106 LOW_MEMORY profile:
-# 64 MiB memory, 3 iterations, 4 parallelism threads.
-# Suitable for 1 GB RAM DigitalOcean App Platform containers.
-# Each concurrent hash operation uses ~64 MiB.
+# Argon2id via pwdlib defaults (no explicit parameter overrides).
+# We intentionally avoid hardcoding Argon2 tuning here so behavior
+# tracks the library's recommended defaults and can evolve safely.
 hashers: list[Any] = [Argon2Hasher()]
 if BcryptHasherType is not None:
     hashers.append(BcryptHasherType())

@@ -14,6 +14,7 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, SessionTransaction, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import app.models  # noqa: F401
 from app.core.database import Base
 from app.main import app
 
