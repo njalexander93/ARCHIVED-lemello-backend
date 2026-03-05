@@ -13,10 +13,11 @@ from pwdlib import PasswordHash
 from pwdlib.exceptions import HasherNotAvailable
 from pwdlib.hashers.argon2 import Argon2Hasher
 
+BcryptHasherType: type[Any] | None
 try:
     from pwdlib.hashers.bcrypt import BcryptHasher as _BcryptHasher
 except HasherNotAvailable:
-    BcryptHasherType: type[_BcryptHasher] | None = None
+    BcryptHasherType = None
 else:
     BcryptHasherType = _BcryptHasher
 

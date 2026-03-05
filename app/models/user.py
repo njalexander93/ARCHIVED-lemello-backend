@@ -56,8 +56,9 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     Attributes:
         id: UUIDv7 primary key (from UUIDMixin).
-        email: Unique email, stored lowercase.
-        username: Unique username, stored lowercase, ASCII-only.
+        email: Unique email. Application layer normalizes to lowercase.
+        username: Unique username, ASCII-only. Application layer normalizes
+            to lowercase.
         hashed_password: Argon2id hash. Nullable for future OAuth users.
         password_changed_at: Tracks last password change for JWT invalidation.
         is_active: Account enabled flag. False blocks login.

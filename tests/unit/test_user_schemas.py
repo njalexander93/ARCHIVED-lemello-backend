@@ -37,6 +37,18 @@ def test_email_normalization() -> None:
     assert user.email == "chef@lemello.com"
 
 
+def test_email_normalization_strips_whitespace() -> None:
+    """Email normalization strips surrounding whitespace."""
+    user = UserCreate(
+        email="  Chef@LEMELLO.com  ",
+        username="souschef_1",
+        password="StrongPass1",
+        password_confirm="StrongPass1",
+    )
+
+    assert user.email == "chef@lemello.com"
+
+
 def test_username_normalization() -> None:
     """Username values are normalized to lowercase."""
     user = UserCreate(
@@ -47,6 +59,17 @@ def test_username_normalization() -> None:
     )
 
     assert user.username == "souschef_1"
+
+
+def test_username_length_is_validated_after_normalization() -> None:
+    """Username length constraints apply after whitespace stripping."""
+    with pytest.raises(ValidationError):
+        UserCreate(
+            email="chef@lemello.com",
+            username="ab ",
+            password="StrongPass1",
+            password_confirm="StrongPass1",
+        )
 
 
 def test_invalid_email_format() -> None:

@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session, SessionTransaction, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base
@@ -59,9 +59,26 @@ def db_session(db_engine: Engine) -> Iterator[Session]:
     connection = db_engine.connect()
     transaction = connection.begin()
     session = sessionmaker(bind=connection)()
+    session.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def restart_nested_transaction(
+        session_: Session,
+        transaction_: SessionTransaction,
+    ) -> None:
+        """Restart SAVEPOINT after each nested transaction end."""
+        parent = transaction_.parent
+        if transaction_.nested and parent is not None and not parent.nested:
+            session_.begin_nested()
+
     try:
         yield session
     finally:
+        event.remove(
+            session,
+            "after_transaction_end",
+            restart_nested_transaction,
+        )
         session.close()
         if transaction.is_active:
             transaction.rollback()

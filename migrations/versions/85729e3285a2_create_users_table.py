@@ -50,7 +50,7 @@ def upgrade() -> None:
                 postgresql.JSONB(astext_type=sa.Text()),
                 "postgresql",
             ),
-            server_default=sa.text("'{}'::jsonb"),
+            server_default=sa.text("'{}'"),
             nullable=False,
         ),
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),

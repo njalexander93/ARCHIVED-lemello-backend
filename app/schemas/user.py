@@ -72,13 +72,13 @@ class UserBase(BaseModel):
     email: EmailStr
     username: str = Field(min_length=3, max_length=30)
 
-    @field_validator("email")
+    @field_validator("email", mode="before")
     @classmethod
     def normalize_email(cls, value: str) -> str:
         """Normalize email to lowercase."""
         return value.lower().strip()
 
-    @field_validator("username")
+    @field_validator("username", mode="before")
     @classmethod
     def validate_username(cls, value: str) -> str:
         """Validate and normalize username.
