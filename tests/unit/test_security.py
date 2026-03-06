@@ -1,6 +1,8 @@
 """Unit tests for password security helpers."""
 
 import pytest
+from pwdlib import PasswordHash
+from pwdlib.exceptions import HasherNotAvailable
 
 from app.core.security import hash_password, verify_password
 
@@ -47,3 +49,20 @@ def test_hash_does_not_contain_plaintext() -> None:
     hashed = hash_password(password)
 
     assert password not in hashed
+
+
+def test_verify_rehashes_legacy_bcrypt_hash() -> None:
+    """Valid bcrypt hashes are verified and upgraded to Argon2id."""
+    try:
+        from pwdlib.hashers.bcrypt import BcryptHasher
+    except HasherNotAvailable:
+        pytest.skip("bcrypt backend not available in this environment")
+
+    legacy_hasher = PasswordHash((BcryptHasher(),))
+    legacy_hash = legacy_hasher.hash("LegacyPass1")
+
+    is_valid, updated_hash = verify_password("LegacyPass1", legacy_hash)
+
+    assert is_valid is True
+    assert updated_hash is not None
+    assert updated_hash.startswith("$argon2id$")
