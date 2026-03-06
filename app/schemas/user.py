@@ -119,7 +119,10 @@ class UserCreate(UserBase):
         min_length=PASSWORD_MIN_LENGTH,
         max_length=PASSWORD_MAX_LENGTH,
     )
-    password_confirm: str
+    password_confirm: str = Field(
+        min_length=PASSWORD_MIN_LENGTH,
+        max_length=PASSWORD_MAX_LENGTH,
+    )
 
     @field_validator("password")
     @classmethod
