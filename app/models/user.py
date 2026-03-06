@@ -32,8 +32,10 @@ class TimestampMixin:
 
     Uses TIMESTAMPTZ (timezone=True) for unambiguous UTC storage.
     Server defaults ensure consistency for non-ORM inserts.
-    Python defaults provide values for in-memory instances
-    before database flush (useful in tests).
+    A Python default is used for created_at so new in-memory
+    instances have a value before database flush (useful in
+    tests). updated_at is populated by the database on insert
+    and update.
     """
 
     created_at: Mapped[datetime] = mapped_column(
