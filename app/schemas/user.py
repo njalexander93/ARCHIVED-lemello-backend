@@ -205,19 +205,21 @@ class UserUpdate(BaseModel):
 
     @field_validator("email", mode="before")
     @classmethod
-    def normalize_email(cls, value: str | None) -> str | None:
+    def normalize_email(cls, value: Any) -> str | None:
         """Normalize email to lowercase if provided."""
-        if value is not None:
-            return value.lower().strip()
-        return value
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Email must be a string.")
+        return value.lower().strip()
 
     @field_validator("username", mode="before")
     @classmethod
-    def validate_username(cls, value: str | None) -> str | None:
+    def validate_username(cls, value: Any) -> str | None:
         """Validate and normalize username if provided.
 
         Args:
-            value: The username string to validate, or None.
+            value: The username value to validate.
 
         Returns:
             Normalized lowercase username, or None.
@@ -226,7 +228,9 @@ class UserUpdate(BaseModel):
             ValueError: If username is invalid or reserved.
         """
         if value is None:
-            return value
+            return None
+        if not isinstance(value, str):
+            raise ValueError("Username must be a string.")
         normalized = value.lower().strip()
         if not USERNAME_PATTERN.match(normalized):
             raise ValueError(

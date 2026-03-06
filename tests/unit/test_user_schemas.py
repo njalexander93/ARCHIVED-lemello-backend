@@ -222,3 +222,15 @@ def test_user_update_partial() -> None:
 
     assert update.email == "chef@lemello.com"
     assert update.username is None
+
+
+def test_user_update_non_string_email_raises_validation_error() -> None:
+    """Non-string email values are rejected in UserUpdate."""
+    with pytest.raises(ValidationError, match="Email must be a string"):
+        UserUpdate(email=123)
+
+
+def test_user_update_non_string_username_raises_validation_error() -> None:
+    """Non-string username values are rejected in UserUpdate."""
+    with pytest.raises(ValidationError, match="Username must be a string"):
+        UserUpdate(username=["name"])
