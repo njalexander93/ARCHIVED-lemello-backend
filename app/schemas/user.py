@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Self
 from uuid import UUID
 
 from pydantic import (
@@ -20,7 +20,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from typing_extensions import Self
 
 # Username validation constants
 USERNAME_PATTERN = re.compile(r"^[a-z][a-z0-9_-]*$")
