@@ -74,13 +74,15 @@ class UserBase(BaseModel):
 
     @field_validator("email", mode="before")
     @classmethod
-    def normalize_email(cls, value: str) -> str:
+    def normalize_email(cls, value: Any) -> str:
         """Normalize email to lowercase."""
+        if not isinstance(value, str):
+            raise ValueError("Email must be a string.")
         return value.lower().strip()
 
     @field_validator("username", mode="before")
     @classmethod
-    def validate_username(cls, value: str) -> str:
+    def validate_username(cls, value: Any) -> str:
         """Validate and normalize username.
 
         Rules:
@@ -97,6 +99,8 @@ class UserBase(BaseModel):
         Raises:
             ValueError: If username is invalid or reserved.
         """
+        if not isinstance(value, str):
+            raise ValueError("Username must be a string.")
         normalized = value.lower().strip()
         if not USERNAME_PATTERN.match(normalized):
             raise ValueError(

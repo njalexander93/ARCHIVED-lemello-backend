@@ -83,6 +83,28 @@ def test_invalid_email_format() -> None:
         )
 
 
+def test_email_none_raises_validation_error() -> None:
+    """None email values are rejected with ValidationError."""
+    with pytest.raises(ValidationError):
+        UserCreate(
+            email=None,
+            username="souschef_1",
+            password="StrongPass1",
+            password_confirm="StrongPass1",
+        )
+
+
+def test_username_none_raises_validation_error() -> None:
+    """None username values are rejected with ValidationError."""
+    with pytest.raises(ValidationError):
+        UserCreate(
+            email="chef@lemello.com",
+            username=None,
+            password="StrongPass1",
+            password_confirm="StrongPass1",
+        )
+
+
 def test_reserved_username() -> None:
     """Reserved username values are rejected."""
     with pytest.raises(ValidationError, match="reserved"):
