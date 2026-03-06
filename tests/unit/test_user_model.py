@@ -93,9 +93,9 @@ def test_user_persistence(db_session: Session) -> None:
 
 
 def test_unique_email_constraint(db_session: Session) -> None:
-    """Duplicate email values violate uniqueness."""
+    """Case-insensitive duplicate email values violate uniqueness."""
     first = User(
-        email="duplicate@lemello.com",
+        email="Duplicate@lemello.com",
         username="first_user",
         hashed_password="hashed-value",
     )
@@ -112,10 +112,10 @@ def test_unique_email_constraint(db_session: Session) -> None:
 
 
 def test_unique_username_constraint(db_session: Session) -> None:
-    """Duplicate username values violate uniqueness."""
+    """Case-insensitive duplicate username values violate uniqueness."""
     first = User(
         email="first@lemello.com",
-        username="dupe_user",
+        username="Dupe_User",
         hashed_password="hashed-value",
     )
     second = User(
