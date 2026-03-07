@@ -21,6 +21,7 @@ dependencies = [
     "psycopg[binary]>=3.2.0,<4.0.0",
     "sqlalchemy>=2.0.45,<2.1.0",
     "pwdlib[argon2]>=0.2.0,<1.0.0",
+    "PyJWT>=2.11.0,<3.0.0",
     "email-validator>=2.0.0,<3.0.0",
 ]
 
@@ -29,6 +30,7 @@ dependencies = [
 dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
+    "time-machine>=3.2.0,<4.0.0",
     "ruff>=0.14.14",
     "mypy>=1.19.1",
     "httpx>=0.28.1",
