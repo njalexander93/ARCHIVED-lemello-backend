@@ -104,7 +104,7 @@ def get_current_user(
             },
         )
 
-    if user.password_changed_at is not None and token_data.iat < int(
+    if user.password_changed_at is not None and token_data.iat <= int(
         user.password_changed_at.timestamp()
     ):
         raise HTTPException(

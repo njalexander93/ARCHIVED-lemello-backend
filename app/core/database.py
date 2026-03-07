@@ -7,6 +7,7 @@ Alembic autogenerate.
 """
 
 from collections.abc import Iterator
+from functools import lru_cache
 
 from sqlalchemy import Engine, MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -36,8 +37,25 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+def _resolve_database_url(url: str | None = None) -> str:
+    """Resolve the database URL from explicit arg or settings."""
+    db_url = url or settings.database_url
+    if not db_url:
+        raise ValueError(
+            "DATABASE_URL is not configured. "
+            "Set it in .env or as an environment variable."
+        )
+    return db_url
+
+
+@lru_cache(maxsize=8)
+def _cached_engine(db_url: str, debug: bool) -> Engine:
+    """Build and cache engines keyed by URL and debug mode."""
+    return create_engine(db_url, echo=debug)
+
+
 def get_engine(url: str | None = None) -> Engine:
-    """Create a SQLAlchemy engine.
+    """Get a SQLAlchemy engine.
 
     Args:
         url: Database URL. Defaults to settings.database_url.
@@ -48,18 +66,25 @@ def get_engine(url: str | None = None) -> Engine:
     Raises:
         ValueError: If no database URL is configured.
     """
-    db_url = url or settings.database_url
-    if not db_url:
-        raise ValueError(
-            "DATABASE_URL is not configured. "
-            "Set it in .env or as an environment variable."
-        )
-    # Keep SQL echo aligned with debug mode for local troubleshooting.
-    return create_engine(db_url, echo=settings.app_debug)
+    db_url = _resolve_database_url(url)
+    # Reuse per-config engines to preserve connection pooling.
+    return _cached_engine(db_url, settings.app_debug)
+
+
+@lru_cache(maxsize=8)
+def _cached_session_factory(
+    db_url: str,
+    debug: bool,
+) -> sessionmaker[Session]:
+    """Build and cache session factories keyed by DB settings."""
+    return sessionmaker(
+        bind=_cached_engine(db_url, debug),
+        expire_on_commit=False,
+    )
 
 
 def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
-    """Create a session factory bound to an engine.
+    """Get a session factory bound to an engine.
 
     Args:
         url: Database URL. Defaults to settings.database_url.
@@ -70,10 +95,9 @@ def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
     Raises:
         ValueError: If no database URL is configured.
     """
-    # Use a fresh engine so tests can override settings cleanly.
-    engine = get_engine(url)
-    # Avoid expiring instances on commit in request-scoped usage.
-    return sessionmaker(bind=engine, expire_on_commit=False)
+    db_url = _resolve_database_url(url)
+    # Keyed caching preserves pooling while still honoring setting overrides.
+    return _cached_session_factory(db_url, settings.app_debug)
 
 
 def get_db() -> Iterator[Session]:
