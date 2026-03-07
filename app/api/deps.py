@@ -104,9 +104,8 @@ def get_current_user(
             },
         )
 
-    if (
-        user.password_changed_at is not None
-        and token_data.iat < user.password_changed_at.timestamp()
+    if user.password_changed_at is not None and token_data.iat < int(
+        user.password_changed_at.timestamp()
     ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

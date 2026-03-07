@@ -16,6 +16,7 @@ from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pwdlib.exceptions import HasherNotAvailable
 from pwdlib.hashers.argon2 import Argon2Hasher
+from pydantic import ValidationError
 
 from app.core.config import settings
 from app.schemas.auth import TokenPayload
@@ -122,7 +123,10 @@ def verify_token(token: str) -> TokenPayload:
         leeway=timedelta(seconds=30),
     )
 
-    token_data = TokenPayload(**payload)
+    try:
+        token_data = TokenPayload(**payload)
+    except ValidationError as exc:
+        raise InvalidTokenError("Invalid token payload") from exc
 
     if token_data.token_type != "access":
         raise InvalidTokenError("Invalid token type")

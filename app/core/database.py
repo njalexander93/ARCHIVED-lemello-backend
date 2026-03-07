@@ -7,7 +7,6 @@ Alembic autogenerate.
 """
 
 from collections.abc import Iterator
-from functools import lru_cache
 
 from sqlalchemy import Engine, MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -77,23 +76,13 @@ def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
-@lru_cache(maxsize=1)
-def _cached_session_factory() -> sessionmaker[Session]:
-    """Return a cached default session factory.
-
-    Returns:
-        A cached sessionmaker bound to the configured database URL.
-    """
-    return get_session_factory()
-
-
 def get_db() -> Iterator[Session]:
     """Yield a request-scoped database session.
 
     Yields:
         A SQLAlchemy Session instance.
     """
-    db = _cached_session_factory()()
+    db = get_session_factory()()
     try:
         yield db
     finally:
