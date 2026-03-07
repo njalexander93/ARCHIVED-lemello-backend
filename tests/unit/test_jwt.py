@@ -266,7 +266,9 @@ class TestWrongKey:
     ) -> None:
         """Token signed with a different key is rejected."""
         token = token_factory(
-            secret="completely-different-secret-key-that-is-long-enough-for-hs256"
+            secret=(
+                "completely-different-secret-key-that-is-long-enough-for-hs256"
+            )
         )
 
         with pytest.raises(
