@@ -7,11 +7,18 @@ migration: if a user logs in with a bcrypt hash, it is
 automatically re-hashed to Argon2id.
 """
 
+import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import jwt
+from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pwdlib.exceptions import HasherNotAvailable
 from pwdlib.hashers.argon2 import Argon2Hasher
+
+from app.core.config import settings
+from app.schemas.auth import TokenPayload
 
 BcryptHasherType: type[Any] | None
 try:
@@ -60,3 +67,64 @@ def verify_password(password: str, hashed: str) -> tuple[bool, str | None]:
         algorithm.
     """
     return _password_hash.verify_and_update(password, hashed)
+
+
+def create_access_token(
+    user_id: uuid.UUID,
+    expires_delta: timedelta | None = None,
+) -> str:
+    """Create a signed JWT access token.
+
+    Args:
+        user_id: The user's UUIDv7 primary key.
+        expires_delta: Optional custom expiration. Defaults to
+            settings.access_token_expire_minutes.
+
+    Returns:
+        Encoded JWT string.
+    """
+    now = datetime.now(timezone.utc)
+    expire = now + (
+        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
+    )
+
+    payload: dict[str, str | datetime] = {
+        "sub": str(user_id),
+        "exp": expire,
+        "iat": now,
+        "jti": str(uuid.uuid4()),
+        "token_type": "access",
+    }
+
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+def verify_token(token: str) -> TokenPayload:
+    """Decode and validate a JWT access token.
+
+    Args:
+        token: The raw JWT string from the Authorization header.
+
+    Returns:
+        Validated TokenPayload with extracted claims.
+
+    Raises:
+        jwt.exceptions.ExpiredSignatureError: Token has expired.
+        jwt.exceptions.DecodeError: Token is malformed or has an invalid
+            signature.
+        jwt.exceptions.InvalidTokenError: Token fails any other validation.
+    """
+    payload = jwt.decode(
+        token,
+        settings.secret_key,
+        algorithms=["HS256"],
+        options={"require": ["sub", "exp", "iat"]},
+        leeway=timedelta(seconds=30),
+    )
+
+    token_data = TokenPayload(**payload)
+
+    if token_data.token_type != "access":
+        raise InvalidTokenError("Invalid token type")
+
+    return token_data
