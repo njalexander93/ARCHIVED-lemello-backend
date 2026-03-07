@@ -41,7 +41,8 @@ class Settings(BaseSettings):
         app_env: Application environment (development, staging, production).
         app_debug: Debug mode flag for development.
         secret_key: JWT signing key for authentication.
-        algorithm: JWT signing algorithm used for token generation.
+        algorithm: Desired JWT signing algorithm (reserved for future use;
+            token generation is currently fixed to HS256).
         access_token_expire_minutes: JWT token expiration time in minutes.
     """
 

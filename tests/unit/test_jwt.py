@@ -131,7 +131,7 @@ class TestExpiredToken:
         with pytest.raises(pyjwt.exceptions.ExpiredSignatureError):
             verify_token(token)
 
-    @time_machine.travel("2026-03-06 12:00:00", tick=False)
+    @time_machine.travel("2026-03-06T12:00:00+00:00", tick=False)
     def test_token_expires_after_lifetime(
         self, sample_user_id: uuid.UUID
     ) -> None:
@@ -144,7 +144,7 @@ class TestExpiredToken:
         payload = verify_token(token)
         assert payload.sub == str(sample_user_id)
 
-    @time_machine.travel("2026-03-06 12:06:00", tick=False)
+    @time_machine.travel("2026-03-06T12:06:00+00:00", tick=False)
     def test_token_expired_after_travel(
         self,
         sample_user_id: uuid.UUID,
