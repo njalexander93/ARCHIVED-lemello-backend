@@ -108,6 +108,38 @@ class TestCreateAccessToken:
         expected_exp = now + delta
         assert abs(payload.exp - int(expected_exp.timestamp())) < 5
 
+    def test_oversized_expiration_is_clamped(
+        self, sample_user_id: uuid.UUID
+    ) -> None:
+        """Custom expiration longer than config max is clamped."""
+        now = datetime.now(timezone.utc)
+        token = create_access_token(
+            user_id=sample_user_id,
+            expires_delta=timedelta(days=7),
+        )
+        payload = verify_token(token)
+
+        expected_exp = now + timedelta(
+            minutes=settings.access_token_expire_minutes
+        )
+        assert abs(payload.exp - int(expected_exp.timestamp())) < 5
+
+    def test_non_positive_expiration_falls_back_to_default(
+        self, sample_user_id: uuid.UUID
+    ) -> None:
+        """Zero/negative custom expiration falls back to configured default."""
+        now = datetime.now(timezone.utc)
+        token = create_access_token(
+            user_id=sample_user_id,
+            expires_delta=timedelta(minutes=0),
+        )
+        payload = verify_token(token)
+
+        expected_exp = now + timedelta(
+            minutes=settings.access_token_expire_minutes
+        )
+        assert abs(payload.exp - int(expected_exp.timestamp())) < 5
+
     def test_unique_jti_per_token(self, sample_user_id: uuid.UUID) -> None:
         """Each token gets a unique jti."""
         token1 = create_access_token(user_id=sample_user_id)
