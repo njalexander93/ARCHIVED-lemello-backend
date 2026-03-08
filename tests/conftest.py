@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session, SessionTransaction, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401
-from app.core.database import Base
+from app.core.database import Base, get_db
 from app.main import app
 
 
@@ -87,11 +87,13 @@ def db_session(db_engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def test_client() -> Iterator[TestClient]:
-    """Create a fresh TestClient for each test.
+def test_client(db_session: Session) -> Iterator[TestClient]:
+    """TestClient that uses the transactional test session."""
 
-    Yields:
-        TestClient configured with the FastAPI app.
-    """
+    def _override_get_db() -> Iterator[Session]:
+        yield db_session
+
+    app.dependency_overrides[get_db] = _override_get_db
     with TestClient(app) as client:
         yield client
+    app.dependency_overrides.clear()
