@@ -80,19 +80,21 @@ def create_access_token(
         user_id: The user's UUIDv7 primary key.
         expires_delta: Optional custom expiration. Defaults to
             settings.access_token_expire_minutes. Values that are
-            non-positive or exceed the configured maximum are clamped
-            to the configured maximum.
+            non-positive are reset to the default. Values longer than
+            the default are clamped down to the default.
 
     Returns:
         Encoded JWT string.
     """
     now = datetime.now(timezone.utc)
-    max_expires_delta = timedelta(minutes=settings.access_token_expire_minutes)
+    default_expires_delta = timedelta(
+        minutes=settings.access_token_expire_minutes
+    )
 
     if expires_delta is None or expires_delta <= timedelta(0):
-        effective_expires_delta = max_expires_delta
-    elif expires_delta > max_expires_delta:
-        effective_expires_delta = max_expires_delta
+        effective_expires_delta = default_expires_delta
+    elif expires_delta > default_expires_delta:
+        effective_expires_delta = default_expires_delta
     else:
         effective_expires_delta = expires_delta
 

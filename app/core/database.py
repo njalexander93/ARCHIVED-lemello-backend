@@ -55,15 +55,14 @@ def _managed_engine(db_url: str, debug: bool) -> Engine:
     global _engine_cache_instance, _engine_cache_key
 
     cache_key = (db_url, debug)
-    if _engine_cache_key != cache_key:
-        if _engine_cache_instance is not None:
-            _engine_cache_instance.dispose()
-        _engine_cache_instance = create_engine(db_url, echo=debug)
-        _engine_cache_key = cache_key
-
     if _engine_cache_instance is None:
         _engine_cache_instance = create_engine(db_url, echo=debug)
         _engine_cache_key = cache_key
+    elif _engine_cache_key != cache_key:
+        _engine_cache_instance.dispose()
+        _engine_cache_instance = create_engine(db_url, echo=debug)
+        _engine_cache_key = cache_key
+
     return _engine_cache_instance
 
 
