@@ -4,9 +4,21 @@ import pytest
 from sqlalchemy.engine import Engine
 
 from app.core.config import settings
-from app.core.database import get_engine, get_session_factory
+from app.core.database import (
+    clear_engine_cache,
+    get_engine,
+    get_session_factory,
+)
 
 pytestmark = pytest.mark.unit
+
+
+@pytest.fixture(autouse=True)
+def _reset_engine_cache() -> None:
+    """Reset cached engine between tests for isolation."""
+    clear_engine_cache()
+    yield
+    clear_engine_cache()
 
 
 def test_get_engine_uses_url_argument() -> None:
@@ -76,5 +88,17 @@ def test_get_engine_cache_varies_by_debug_setting(
     monkeypatch.setattr(settings, "app_debug", False)
     first = get_engine()
     monkeypatch.setattr(settings, "app_debug", True)
+    second = get_engine()
+    assert first is not second
+
+
+def test_clear_engine_cache_resets_cached_instance(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Clearing cache should force a fresh engine creation."""
+    monkeypatch.setattr(settings, "database_url", "sqlite+pysqlite:///:memory:")
+    monkeypatch.setattr(settings, "app_debug", False)
+    first = get_engine()
+    clear_engine_cache()
     second = get_engine()
     assert first is not second

@@ -7,7 +7,6 @@ Alembic autogenerate.
 """
 
 from collections.abc import Iterator
-from functools import lru_cache
 
 from sqlalchemy import Engine, MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
@@ -21,6 +20,9 @@ NAMING_CONVENTION: dict[str, str] = {
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
     "pk": "pk_%(table_name)s",
 }
+
+_engine_cache_key: tuple[str, bool] | None = None
+_engine_cache_instance: Engine | None = None
 
 
 class Base(DeclarativeBase):
@@ -48,10 +50,31 @@ def _resolve_database_url(url: str | None = None) -> str:
     return db_url
 
 
-@lru_cache(maxsize=8)
-def _cached_engine(db_url: str, debug: bool) -> Engine:
-    """Build and cache engines keyed by URL and debug mode."""
-    return create_engine(db_url, echo=debug)
+def _managed_engine(db_url: str, debug: bool) -> Engine:
+    """Return cached engine for active key, disposing stale engine on swap."""
+    global _engine_cache_instance, _engine_cache_key
+
+    cache_key = (db_url, debug)
+    if _engine_cache_key != cache_key:
+        if _engine_cache_instance is not None:
+            _engine_cache_instance.dispose()
+        _engine_cache_instance = create_engine(db_url, echo=debug)
+        _engine_cache_key = cache_key
+
+    if _engine_cache_instance is None:
+        _engine_cache_instance = create_engine(db_url, echo=debug)
+        _engine_cache_key = cache_key
+    return _engine_cache_instance
+
+
+def clear_engine_cache() -> None:
+    """Dispose and clear the cached engine instance."""
+    global _engine_cache_instance, _engine_cache_key
+
+    if _engine_cache_instance is not None:
+        _engine_cache_instance.dispose()
+    _engine_cache_instance = None
+    _engine_cache_key = None
 
 
 def get_engine(url: str | None = None) -> Engine:
@@ -67,20 +90,8 @@ def get_engine(url: str | None = None) -> Engine:
         ValueError: If no database URL is configured.
     """
     db_url = _resolve_database_url(url)
-    # Reuse per-config engines to preserve connection pooling.
-    return _cached_engine(db_url, settings.app_debug)
-
-
-@lru_cache(maxsize=8)
-def _cached_session_factory(
-    db_url: str,
-    debug: bool,
-) -> sessionmaker[Session]:
-    """Build and cache session factories keyed by DB settings."""
-    return sessionmaker(
-        bind=_cached_engine(db_url, debug),
-        expire_on_commit=False,
-    )
+    # Reuse per-config engine and dispose stale engine when key changes.
+    return _managed_engine(db_url, settings.app_debug)
 
 
 def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
@@ -95,9 +106,9 @@ def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
     Raises:
         ValueError: If no database URL is configured.
     """
-    db_url = _resolve_database_url(url)
-    # Keyed caching preserves pooling while still honoring setting overrides.
-    return _cached_session_factory(db_url, settings.app_debug)
+    engine = get_engine(url)
+    # Avoid expiring instances on commit in request-scoped usage.
+    return sessionmaker(bind=engine, expire_on_commit=False)
 
 
 def get_db() -> Iterator[Session]:
@@ -106,7 +117,8 @@ def get_db() -> Iterator[Session]:
     Yields:
         A SQLAlchemy Session instance.
     """
-    db = get_session_factory()()
+    session_factory = get_session_factory()
+    db = session_factory()
     try:
         yield db
     finally:
