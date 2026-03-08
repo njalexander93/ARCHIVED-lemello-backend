@@ -41,6 +41,8 @@ class Settings(BaseSettings):
         app_env: Application environment (development, staging, production).
         app_debug: Debug mode flag for development.
         secret_key: JWT signing key for authentication.
+        algorithm: Desired JWT signing algorithm (reserved for future use;
+            token generation is currently fixed to HS256).
         access_token_expire_minutes: JWT token expiration time in minutes.
     """
 
@@ -63,11 +65,12 @@ class Settings(BaseSettings):
         default="change_me_generate_with_openssl_dev_only",
         alias="SECRET_KEY",
     )
+    algorithm: str = Field(default="HS256", alias="ALGORITHM")
     access_token_expire_minutes: int = Field(
-        default=60,
+        default=30,
         alias="ACCESS_TOKEN_EXPIRE_MINUTES",
         ge=1,
-        le=10080,  # Max 1 week
+        le=60,  # Max 1 hour
     )
 
     # Database settings
