@@ -3,23 +3,25 @@
 Main application factory with CORS middleware and router registration.
 """
 
+from __future__ import annotations
+
 import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.exception_handlers import (
-    http_exception_handler,
-    request_validation_exception_handler,
-)
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
 from app import __version__
+from app.api.v1.auth import router as auth_router
 from app.core.config import Environment, settings
+from app.core.exceptions import AppException
 from app.core.logger import (
     configure_logging,
     correlation_id_var,
@@ -27,6 +29,7 @@ from app.core.logger import (
     shutdown_logging,
 )
 from app.routers import health
+from app.schemas.errors import ErrorResponse, FieldError
 
 log = get_logger(__name__)
 
@@ -146,11 +149,49 @@ async def http_exception_with_correlation(
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_with_correlation(
+async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> Response:
-    """Attach correlation ID to validation error responses."""
-    response = await request_validation_exception_handler(request, exc)
+    """Return validation errors in the standardized error envelope."""
+    errors = [
+        FieldError(
+            field=".".join(str(loc) for loc in error["loc"] if loc != "body"),
+            message=error["msg"],
+        )
+        for error in exc.errors()
+    ]
+    body = ErrorResponse(
+        type="validation_error",
+        title="Validation Error",
+        status=400,
+        detail="Request body contains invalid fields.",
+        errors=errors,
+    )
+    response = JSONResponse(
+        status_code=400,
+        content=body.model_dump(exclude_none=True),
+    )
+    correlation_id = getattr(request.state, "correlation_id", None)
+    if correlation_id:
+        response.headers["X-Correlation-ID"] = correlation_id
+    return apply_security_headers(response)
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(
+    request: Request, exc: AppException
+) -> Response:
+    """Return application domain errors in the standardized envelope."""
+    body = ErrorResponse(
+        type=exc.type,
+        title=exc.title,
+        status=exc.status_code,
+        detail=exc.detail,
+    )
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content=body.model_dump(exclude_none=True),
+    )
     correlation_id = getattr(request.state, "correlation_id", None)
     if correlation_id:
         response.headers["X-Correlation-ID"] = correlation_id
@@ -271,6 +312,36 @@ async def add_security_headers(
 
 # Register routers
 app.include_router(health.router)
+app.include_router(auth_router, prefix="/api/v1")
+
+
+def custom_openapi() -> dict[str, object]:
+    """Patch OpenAPI to document 400 validation responses instead of 422."""
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        routes=app.routes,
+    )
+    for path_data in schema.get("paths", {}).values():
+        for operation in path_data.values():
+            responses = operation.get("responses", {})
+            if "422" in responses:
+                if "400" not in responses:
+                    responses["400"] = responses["422"]
+                    responses["400"]["description"] = "Validation Error"
+                del responses["422"]
+
+    schemas = schema.get("components", {}).get("schemas", {})
+    schemas.pop("HTTPValidationError", None)
+    schemas.pop("ValidationError", None)
+    app.openapi_schema = schema
+    return schema
+
+
+setattr(app, "openapi", custom_openapi)
 
 
 @app.get("/")
