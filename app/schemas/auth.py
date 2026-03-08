@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.user import UserResponse
 
 
 class TokenPayload(BaseModel):
@@ -32,7 +34,19 @@ class TokenResponse(BaseModel):
     Attributes:
         access_token: The encoded JWT string.
         token_type: Always "bearer" per OAuth2 spec.
+        expires_in: Token lifetime in seconds.
     """
 
     access_token: str
     token_type: str = "bearer"
+    expires_in: int = Field(
+        ...,
+        description="Token lifetime in seconds",
+    )
+
+
+class AuthResponse(BaseModel):
+    """Response for registration and login endpoints."""
+
+    token: TokenResponse
+    user: UserResponse
