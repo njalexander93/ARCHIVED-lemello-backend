@@ -87,14 +87,9 @@ class TestArgon2idConfiguration:
         assert int(params["t"]) == settings.argon2_time_cost
         assert int(params["p"]) == settings.argon2_parallelism
 
-    def test_argon2_memory_cost_below_owasp_minimum_rejected(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    def test_argon2_memory_cost_below_owasp_minimum_rejected(self) -> None:
         """Settings rejects argon2_memory_cost below OWASP floor."""
         from app.core.config import Settings
-
-        del monkeypatch
 
         with pytest.raises(ValidationError, match="7168"):
             Settings(
@@ -102,14 +97,9 @@ class TestArgon2idConfiguration:
                 SECRET_KEY="a" * 32 + "b",
             )
 
-    def test_argon2_time_cost_zero_rejected(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    def test_argon2_time_cost_zero_rejected(self) -> None:
         """Settings rejects argon2_time_cost below 1."""
         from app.core.config import Settings
-
-        del monkeypatch
 
         with pytest.raises(ValidationError, match="ARGON2_TIME_COST"):
             Settings(
@@ -117,14 +107,9 @@ class TestArgon2idConfiguration:
                 SECRET_KEY="a" * 32 + "b",
             )
 
-    def test_argon2_parallelism_zero_rejected(
-        self,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
+    def test_argon2_parallelism_zero_rejected(self) -> None:
         """Settings rejects argon2_parallelism below 1."""
         from app.core.config import Settings
-
-        del monkeypatch
 
         with pytest.raises(ValidationError, match="ARGON2_PARALLELISM"):
             Settings(
