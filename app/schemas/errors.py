@@ -37,7 +37,7 @@ class ErrorResponse(BaseModel):
                     "type": "validation_error",
                     "title": "Validation Error",
                     "status": 400,
-                    "detail": "Request body contains invalid fields.",
+                    "detail": "Request contains invalid parameters.",
                     "errors": [
                         {
                             "field": "password",
