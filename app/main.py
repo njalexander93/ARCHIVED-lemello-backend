@@ -338,9 +338,19 @@ def custom_openapi() -> dict[str, object]:
 
     schema = get_openapi(
         title=app.title,
+        summary=app.summary,
         description=app.description,
         version=app.version,
+        openapi_version=app.openapi_version,
         routes=app.routes,
+        webhooks=app.webhooks.routes,
+        tags=app.openapi_tags,
+        servers=app.servers,
+        terms_of_service=app.terms_of_service,
+        contact=app.contact,
+        license_info=app.license_info,
+        separate_input_output_schemas=(app.separate_input_output_schemas),
+        external_docs=app.openapi_external_docs,
     )
     for path_data in schema.get("paths", {}).values():
         if not isinstance(path_data, dict):

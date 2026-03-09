@@ -82,3 +82,78 @@ def test_custom_openapi_rewrites_validation_responses(
     }
     assert "HTTPValidationError" not in schema["components"]["schemas"]
     assert "ValidationError" not in schema["components"]["schemas"]
+
+
+def test_custom_openapi_preserves_app_openapi_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Forwards optional FastAPI OpenAPI metadata to get_openapi()."""
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(main_module.app, "summary", "API summary")
+    monkeypatch.setattr(main_module.app, "openapi_version", "3.1.1")
+    monkeypatch.setattr(
+        main_module.app,
+        "openapi_tags",
+        [{"name": "recipes"}],
+    )
+    monkeypatch.setattr(
+        main_module.app,
+        "servers",
+        [{"url": "https://api.example.com"}],
+    )
+    monkeypatch.setattr(
+        main_module.app,
+        "terms_of_service",
+        "https://example.com/terms",
+    )
+    monkeypatch.setattr(
+        main_module.app,
+        "contact",
+        {"name": "Support"},
+    )
+    monkeypatch.setattr(
+        main_module.app,
+        "license_info",
+        {"name": "MIT"},
+    )
+    monkeypatch.setattr(
+        main_module.app,
+        "separate_input_output_schemas",
+        False,
+    )
+    monkeypatch.setattr(
+        main_module.app,
+        "openapi_external_docs",
+        {"description": "Docs", "url": "https://example.com/docs"},
+    )
+    monkeypatch.setattr(
+        main_module.app.webhooks,
+        "routes",
+        ["webhook-route"],
+    )
+
+    def fake_get_openapi(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {
+            "paths": {},
+            "components": {"schemas": {}},
+        }
+
+    monkeypatch.setattr(main_module, "get_openapi", fake_get_openapi)
+
+    main_module.custom_openapi()
+
+    assert captured["summary"] == "API summary"
+    assert captured["openapi_version"] == "3.1.1"
+    assert captured["tags"] == [{"name": "recipes"}]
+    assert captured["servers"] == [{"url": "https://api.example.com"}]
+    assert captured["terms_of_service"] == "https://example.com/terms"
+    assert captured["contact"] == {"name": "Support"}
+    assert captured["license_info"] == {"name": "MIT"}
+    assert captured["separate_input_output_schemas"] is False
+    assert captured["external_docs"] == {
+        "description": "Docs",
+        "url": "https://example.com/docs",
+    }
+    assert captured["webhooks"] == ["webhook-route"]
