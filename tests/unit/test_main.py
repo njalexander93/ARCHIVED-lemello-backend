@@ -12,6 +12,8 @@ from fastapi.exceptions import RequestValidationError
 
 import app.main as main_module
 
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture(autouse=True)
 def reset_openapi_schema() -> None:
