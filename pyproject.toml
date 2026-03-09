@@ -1,6 +1,6 @@
 [project]
 name = "lemello-backend"
-version = "0.1.4"
+version = "0.1.5"
 description = "Core API and AI orchestration service for lemello, built with FastAPI. Handles recipe creation sessions, persistence, security, and integration with LLM providers."
 authors = [
     {name = "Nikolai Alexander", email = "njalexander93@gmail.com"}
