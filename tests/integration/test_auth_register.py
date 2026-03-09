@@ -178,8 +178,14 @@ class TestRegisterSuccess:
         response = _register(test_client, _payload())
 
         assert response.status_code == 201
-        assert "password" not in response.text
-        assert "hashed_password" not in response.text
+        data = response.json()
+        user = data["user"]
+        token = data["token"]
+
+        assert "password" not in user
+        assert "hashed_password" not in user
+        assert "password" not in token
+        assert "hashed_password" not in token
 
     def test_user_is_active_by_default(
         self,

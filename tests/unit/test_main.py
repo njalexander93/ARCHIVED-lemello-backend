@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 from copy import deepcopy
 
 import pytest
+from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 
 import app.main as main_module
 
@@ -157,3 +161,39 @@ def test_custom_openapi_preserves_app_openapi_metadata(
         "url": "https://example.com/docs",
     }
     assert captured["webhooks"] == ["webhook-route"]
+
+
+def test_validation_exception_handler_uses_generic_detail() -> None:
+    """Uses request-part agnostic detail text for validation failures."""
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/health",
+            "headers": [],
+        }
+    )
+    request.state.correlation_id = "test-correlation-id"
+    exc = RequestValidationError(
+        [
+            {
+                "type": "missing",
+                "loc": ("query", "limit"),
+                "msg": "Field required",
+                "input": None,
+            }
+        ]
+    )
+
+    response = asyncio.run(
+        main_module.validation_exception_handler(request, exc)
+    )
+    data = json.loads(response.body)
+
+    assert data["detail"] == "Request contains invalid parameters."
+    assert data["errors"] == [
+        {
+            "field": "query.limit",
+            "message": "Field required",
+        }
+    ]
