@@ -3,7 +3,9 @@
 import pytest
 from pwdlib import PasswordHash
 from pwdlib.exceptions import HasherNotAvailable
+from pydantic import ValidationError
 
+from app.core.config import settings
 from app.core.security import hash_password, verify_password
 
 pytestmark = pytest.mark.unit
@@ -66,3 +68,81 @@ def test_verify_rehashes_legacy_bcrypt_hash() -> None:
     assert is_valid is True
     assert updated_hash is not None
     assert updated_hash.startswith("$argon2id$")
+
+
+class TestArgon2idConfiguration:
+    """Unit tests for configurable Argon2id hashing behavior."""
+
+    def test_hash_uses_configured_parameters(self) -> None:
+        """New hashes encode the configured Argon2id parameters."""
+        hashed = hash_password("TestPass1")
+
+        parts = hashed.split("$")
+        assert parts[1] == "argon2id"
+
+        param_str = parts[3]
+        params = dict(item.split("=") for item in param_str.split(","))
+
+        assert int(params["m"]) == settings.argon2_memory_cost
+        assert int(params["t"]) == settings.argon2_time_cost
+        assert int(params["p"]) == settings.argon2_parallelism
+
+    def test_argon2_memory_cost_below_owasp_minimum_rejected(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Settings rejects argon2_memory_cost below OWASP floor."""
+        from app.core.config import Settings
+
+        del monkeypatch
+
+        with pytest.raises(ValidationError, match="7168"):
+            Settings(
+                ARGON2_MEMORY_COST=1024,
+                SECRET_KEY="a" * 32 + "b",
+            )
+
+    def test_argon2_time_cost_zero_rejected(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Settings rejects argon2_time_cost below 1."""
+        from app.core.config import Settings
+
+        del monkeypatch
+
+        with pytest.raises(ValidationError, match="ARGON2_TIME_COST"):
+            Settings(
+                ARGON2_TIME_COST=0,
+                SECRET_KEY="a" * 32 + "b",
+            )
+
+    def test_argon2_parallelism_zero_rejected(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Settings rejects argon2_parallelism below 1."""
+        from app.core.config import Settings
+
+        del monkeypatch
+
+        with pytest.raises(ValidationError, match="ARGON2_PARALLELISM"):
+            Settings(
+                ARGON2_PARALLELISM=0,
+                SECRET_KEY="a" * 32 + "b",
+            )
+
+    def test_verify_rejects_malformed_hash(self) -> None:
+        """verify_password raises on completely invalid hash strings."""
+        from pwdlib.exceptions import UnknownHashError
+
+        with pytest.raises(UnknownHashError):
+            verify_password("TestPass1", "not-a-valid-hash")
+
+    def test_hash_empty_password(self) -> None:
+        """Empty string can be hashed (length validation is Pydantic's job)."""
+        hashed = hash_password("")
+        assert hashed.startswith("$argon2id$")
+
+        is_valid, _ = verify_password("", hashed)
+        assert is_valid is True
