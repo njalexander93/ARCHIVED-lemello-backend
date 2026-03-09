@@ -155,7 +155,10 @@ async def validation_exception_handler(
     """Return validation errors in the standardized error envelope."""
     errors = [
         FieldError(
-            field=".".join(str(loc) for loc in error["loc"] if loc != "body"),
+            field=(
+                ".".join(str(loc) for loc in error["loc"] if loc != "body")
+                or "non_field_error"
+            ),
             message=error["msg"],
         )
         for error in exc.errors()
@@ -322,6 +325,7 @@ def custom_openapi() -> dict[str, object]:
 
     schema = get_openapi(
         title=app.title,
+        description=app.description,
         version=app.version,
         routes=app.routes,
     )

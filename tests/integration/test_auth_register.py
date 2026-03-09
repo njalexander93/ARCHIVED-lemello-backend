@@ -331,6 +331,7 @@ class TestRegisterValidation:
 
         _assert_error_envelope(response, 400)
         errors = response.json()["errors"]
+        assert any(error["field"] == "non_field_error" for error in errors)
         assert any(
             "Passwords do not match." in error["message"] for error in errors
         )
@@ -528,3 +529,23 @@ class TestRegisterEdgeCases:
         assert response.status_code == 201
         assert response.json()["user"]["email"] == VALID_PAYLOAD["email"]
         assert response.json()["user"]["username"] == VALID_PAYLOAD["username"]
+
+
+class TestRegisterOpenAPI:
+    """OpenAPI documentation scenarios for registration."""
+
+    def test_openapi_preserves_description_and_register_responses(
+        self,
+        test_client: TestClient,
+    ) -> None:
+        """Documents register responses without dropping app metadata."""
+        response = test_client.get("/openapi.json")
+
+        assert response.status_code == 200
+        data = response.json()
+        register_post = data["paths"][REGISTER_URL]["post"]
+
+        assert data["info"]["description"] == (
+            "AI-powered cooking assistant and recipe creation platform"
+        )
+        assert set(register_post["responses"]) == {"201", "400", "409"}

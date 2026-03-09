@@ -75,6 +75,8 @@ def register_user(
     )
 
     try:
+        # A SAVEPOINT keeps the outer request transaction usable after a
+        # uniqueness violation during flush.
         with db.begin_nested():
             db.add(user)
             db.flush()
