@@ -549,3 +549,11 @@ class TestRegisterOpenAPI:
             "AI-powered cooking assistant and recipe creation platform"
         )
         assert set(register_post["responses"]) == {"201", "400", "409"}
+        assert register_post["responses"]["400"]["content"]["application/json"][
+            "schema"
+        ] == {
+            "$ref": "#/components/schemas/ErrorResponse",
+        }
+        schemas = data["components"]["schemas"]
+        assert "HTTPValidationError" not in schemas
+        assert "ValidationError" not in schemas

@@ -5,6 +5,7 @@ Main application factory with CORS middleware and router registration.
 
 from __future__ import annotations
 
+import json
 import re
 import time
 import uuid
@@ -32,6 +33,18 @@ from app.routers import health
 from app.schemas.errors import ErrorResponse, FieldError
 
 log = get_logger(__name__)
+
+OPENAPI_OPERATION_METHODS = (
+    "get",
+    "put",
+    "post",
+    "delete",
+    "options",
+    "head",
+    "patch",
+    "trace",
+)
+ERROR_RESPONSE_SCHEMA_REF = "#/components/schemas/ErrorResponse"
 
 # Create FastAPI application instance
 app = FastAPI(
@@ -330,17 +343,36 @@ def custom_openapi() -> dict[str, object]:
         routes=app.routes,
     )
     for path_data in schema.get("paths", {}).values():
-        for operation in path_data.values():
+        if not isinstance(path_data, dict):
+            continue
+        for method in OPENAPI_OPERATION_METHODS:
+            operation = path_data.get(method)
+            if not isinstance(operation, dict):
+                continue
             responses = operation.get("responses", {})
-            if "422" in responses:
-                if "400" not in responses:
-                    responses["400"] = responses["422"]
-                    responses["400"]["description"] = "Validation Error"
-                del responses["422"]
+            if not isinstance(responses, dict) or "422" not in responses:
+                continue
+            if "400" not in responses:
+                responses["400"] = {
+                    "description": "Validation Error",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": ERROR_RESPONSE_SCHEMA_REF,
+                            }
+                        }
+                    },
+                }
+            del responses["422"]
 
     schemas = schema.get("components", {}).get("schemas", {})
-    schemas.pop("HTTPValidationError", None)
-    schemas.pop("ValidationError", None)
+    if isinstance(schemas, dict):
+        schema_json = json.dumps(schema)
+        if "#/components/schemas/HTTPValidationError" not in schema_json:
+            schemas.pop("HTTPValidationError", None)
+            schema_json = json.dumps(schema)
+        if "#/components/schemas/ValidationError" not in schema_json:
+            schemas.pop("ValidationError", None)
     app.openapi_schema = schema
     return schema
 
