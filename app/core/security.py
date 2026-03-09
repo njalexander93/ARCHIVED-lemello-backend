@@ -32,7 +32,13 @@ else:
 # Argon2id via pwdlib defaults (no explicit parameter overrides).
 # We intentionally avoid hardcoding Argon2 tuning here so behavior
 # tracks the library's recommended defaults and can evolve safely.
-hashers: list[Any] = [Argon2Hasher()]
+hashers: list[Any] = [
+    Argon2Hasher(
+        memory_cost=settings.argon2_memory_cost,
+        time_cost=settings.argon2_time_cost,
+        parallelism=settings.argon2_parallelism,
+    )
+]
 if BcryptHasherType is not None:
     hashers.append(BcryptHasherType())
 _password_hash = PasswordHash(tuple(hashers))
