@@ -73,6 +73,20 @@ class Settings(BaseSettings):
         le=60,  # Max 1 hour
     )
 
+    # Password Hashing
+    argon2_memory_cost: int = Field(
+        default=19456,
+        alias="ARGON2_MEMORY_COST",
+    )
+    argon2_time_cost: int = Field(
+        default=2,
+        alias="ARGON2_TIME_COST",
+    )
+    argon2_parallelism: int = Field(
+        default=1,
+        alias="ARGON2_PARALLELISM",
+    )
+
     # Database settings
     database_url: Optional[str] = Field(
         default=None,
@@ -205,6 +219,66 @@ class Settings(BaseSettings):
         if v.lower() in [k.lower() for k in weak_keys]:
             raise ValueError("SECRET_KEY is too predictable")
 
+        return v
+
+    @field_validator("argon2_memory_cost")
+    @classmethod
+    def validate_argon2_memory_cost(cls, v: int) -> int:
+        """Enforce OWASP minimum memory cost for Argon2id.
+
+        The floor of 7168 KiB corresponds to OWASP Option E,
+        the lowest recommended Argon2id configuration.
+
+        Args:
+            v: Memory cost in KiB.
+
+        Returns:
+            The validated memory cost.
+
+        Raises:
+            ValueError: If memory cost is below the OWASP minimum.
+        """
+        if v < 7168:
+            raise ValueError(
+                "ARGON2_MEMORY_COST must be >= 7168 KiB "
+                f"(OWASP minimum). Got: {v}"
+            )
+        return v
+
+    @field_validator("argon2_time_cost")
+    @classmethod
+    def validate_argon2_time_cost(cls, v: int) -> int:
+        """Enforce minimum time cost for Argon2id.
+
+        Args:
+            v: Number of iterations.
+
+        Returns:
+            The validated time cost.
+
+        Raises:
+            ValueError: If time cost is below 1.
+        """
+        if v < 1:
+            raise ValueError(f"ARGON2_TIME_COST must be >= 1. Got: {v}")
+        return v
+
+    @field_validator("argon2_parallelism")
+    @classmethod
+    def validate_argon2_parallelism(cls, v: int) -> int:
+        """Enforce minimum parallelism for Argon2id.
+
+        Args:
+            v: Degree of parallelism.
+
+        Returns:
+            The validated parallelism.
+
+        Raises:
+            ValueError: If parallelism is below 1.
+        """
+        if v < 1:
+            raise ValueError(f"ARGON2_PARALLELISM must be >= 1. Got: {v}")
         return v
 
 

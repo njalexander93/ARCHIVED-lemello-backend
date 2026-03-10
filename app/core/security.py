@@ -1,7 +1,9 @@
 """Password hashing and verification using Argon2id.
 
 Uses pwdlib with Argon2id as the primary hasher (OWASP 2025
-recommendation) and bcrypt as a legacy fallback. The
+recommendation) and bcrypt as a legacy fallback. Argon2id
+parameters are configured via environment variables with
+OWASP minimum floors enforced at startup. The
 verify_and_update pattern enables transparent algorithm
 migration: if a user logs in with a bcrypt hash, it is
 automatically re-hashed to Argon2id.
@@ -29,10 +31,17 @@ except HasherNotAvailable:
 else:
     BcryptHasherType = _BcryptHasher
 
-# Argon2id via pwdlib defaults (no explicit parameter overrides).
-# We intentionally avoid hardcoding Argon2 tuning here so behavior
-# tracks the library's recommended defaults and can evolve safely.
-hashers: list[Any] = [Argon2Hasher()]
+# Argon2id with OWASP-aligned parameters from configuration.
+# Defaults: m=19456 KiB, t=2, p=1 (OWASP Option B).
+# Verification reads parameters from the stored hash string,
+# so changing these values only affects NEW hashes.
+hashers: list[Any] = [
+    Argon2Hasher(
+        memory_cost=settings.argon2_memory_cost,
+        time_cost=settings.argon2_time_cost,
+        parallelism=settings.argon2_parallelism,
+    )
+]
 if BcryptHasherType is not None:
     hashers.append(BcryptHasherType())
 _password_hash = PasswordHash(tuple(hashers))
